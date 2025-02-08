@@ -55,7 +55,6 @@ def get_note_offset(root: str, accidental: Union[str, None]) -> int:
             if type(note) is tuple:
                 note_accidental = root + accidental
                 if note_accidental in note:
-                    print(f'note_accidental = {note_accidental} in note {note}')
                     note_index = index
         else:
             if root ==  note:
@@ -183,19 +182,15 @@ def create_sequence(chord_data: list, direction: str) -> None:
     # Figure out the value of the base MIDI note, since once we have 
     # that we can simply add the scale degree to it to find the next MIDI Note.
     base_midi_note = note_offset + (12 * int(octave))
-    print(f"base_midi_note = {base_midi_note}")
 
     midi_notes = []
     for degree in degrees_to_play:
         note = base_midi_note + degree 
         midi_notes.append(note)
-    
-    print(midi_notes)
 
     # SynthDefs take frequencies in hertz, not MIDI notes.
     # So we need to convert them.
     frequencies = [midi_note_number_to_frequency(x) for x in midi_notes]
-    print(frequencies)
     # Finally create the SequencePlayer
     arpeggiator_sequence = SequencePattern(frequencies, iterations=None)
 

@@ -1,3 +1,16 @@
+"""Play an arpeggio using Supriya's Clock class.
+
+A version of arpeggio.py that uses Supriya's Clock class
+instead of patterns.  Using Clock requires more code, but
+gives a lot more fine level control over behaviour, and
+is more intuitive, as you can set BPM and quantization.
+
+Typical usage example:
+
+  python arpeggiator_clock.py -b 120 -q 1/16 -c C#m3 -d up -r 4
+"""
+
+
 import re
 import sys
 from typing import get_args, Union
@@ -212,6 +225,14 @@ def start(bpm: int, quantization: str, chord: str, direction: str, repetitions: 
 ########################################
 
 def arpeggiator_clock_callback(context = ClockContext, delta=0.0625, time_unit=TimeUnit.BEATS) -> tuple[float, TimeUnit]:
+    """The function that runs on each invocation.
+
+    The callback is executed once every `delta`.  What delta means depends on time_unit.  
+    Options for time_unit are BEATS or SECONDS.  If you want this function to called
+    once every 1/4, 1/8, or 1/16 note, then time_unit should be BEATS.  Otherwise
+    you can specify SECONDS as the time_unit to have it called outside of a 
+    musical rhythmic context.
+    """
     global iterations
     global notes
     global quantization_delta
@@ -227,6 +248,7 @@ def arpeggiator_clock_callback(context = ClockContext, delta=0.0625, time_unit=T
     return delta, time_unit
 
 def initialize(bpm: int, quantization: float) -> None:
+    """Initialize the relevant Supriya objects."""
     global clock
     global clock_event_id
     global quantization_delta
@@ -238,13 +260,24 @@ def initialize(bpm: int, quantization: float) -> None:
     server.sync()
 
     clock = Clock()
+    # Set the BPM of the clock
     clock.change(beats_per_minute=bpm)
+    # This helper function converts a string like '1/16' into a numeric value
+    # used by the clock.
     quantization_delta = clock.quantization_to_beats(quantization=quantization)
     clock.start()
 
 def play_note(note: float) -> None:
+    """Create a synth, which automatically plays the note.
+
+    Synths in SuperCollider can be persistant, but are gnerally treated
+    as ephermal objects.  They are highly optimized in SuperCollider's
+    server so that creating many in a short time is efficient.
+    """
     global server
     
+    # We don't need to worry about deallocating anything as that is
+    # handled in the SynthDef.
     _ = server.add_synth(synthdef=saw, frequency=note)
 
 @synthdef()
@@ -263,25 +296,28 @@ def saw(frequency=440.0, amplitude=0.5) -> None:
     Args:
         frequency: the frequency in hertz of a note.
         amplitude: the volume.
-        gate: an int, 1 or 0, that controls the envelope.
     """
     signal = LFSaw.ar(frequency=[frequency, frequency - 2])
     signal *= amplitude
     signal = Limiter.ar(duration=0.01, level=0.1, source=signal)
     
+    # Using a percussive envelope and setting the done_action to 2
+    # means that SuperCollider will handle deallocating eveyrything
+    # for us.  No gate is needed.
     env = EnvGen.kr(envelope=Envelope.percussive(), done_action=2)
     signal *= env
 
     Out.ar(bus=0, source=signal)
 
 def start_arpeggiator() -> None:
+    """Start the arpeggiator by cueing the callback on the clock."""
     global clock_event_id
 
     # Set the arpegiator to begin playing on the next quarter note.
     clock_event_id = clock.cue(procedure=arpeggiator_clock_callback, quantization='1/4')
 
 def stop_arpeggiator() -> None:
-    """Stop the clock."""
+    """Stop the clock and exit the program."""
     global clock
     global clock_event_id
     global server
@@ -292,12 +328,22 @@ def stop_arpeggiator() -> None:
     exit(0)
 
 def verify_bpm(bpm: int) -> None:
-    if bpm < 0 or bpm > 220:
+    """Make sure the BPM is in a resaonable range.
+
+    Args:
+        bpm: the beats per minute
+    """
+    if bpm < 60 or bpm > 220:
         print(f'Invalid bpm {bpm}')
         print('Please enter a BPM in the range 60-220')
         sys.exit(1)
 
 def verify_quantization(quantization: str) -> None:
+    """Make sure the quantization is one that matches what's available.
+
+    Args:
+        quantization: a string in the form 1/4, 1/8T, etc.
+    """
     if quantization not in get_args(Quantization):
         print(f'Invlaid quantization {quantization}')
         print('Please provide one of the following: ')

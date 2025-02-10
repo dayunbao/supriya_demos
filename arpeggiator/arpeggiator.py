@@ -67,7 +67,7 @@ def get_scale_degrees_indices(direction: str) -> list[int]:
 
     Args:
         direction: a string indicating whether notes are played
-        in asending order, descending order, or both.
+        in ascending order, descending order, or both.
     
     Returns:
         a list of ints that will be used to index an array
@@ -102,7 +102,7 @@ def verify_arp_direction(direction: str) -> None:
 
     Args:
         direction: a string indicating whether notes are played
-        in asending order, descending order, or both.
+        in ascending order, descending order, or both.
     """
     direction_regex = re.compile(r"^(up|down|up-and-down)$")
     if not direction_regex.fullmatch(direction):
@@ -155,7 +155,7 @@ def create_sequence(chord_data: list, direction: str) -> None:
         might be None if the note is neither sharp nor flat.
 
         direction: a string indicating whether notes are played
-        in asending order, descending order, or both.
+        in ascending order, descending order, or both.
     """
     global arpeggiator_sequence
 
@@ -176,7 +176,7 @@ def create_sequence(chord_data: list, direction: str) -> None:
     scale_degrees_indices = get_scale_degrees_indices(direction=direction)
     degrees_to_play = [scale_degrees[x] for x in scale_degrees_indices]
 
-    # Need to add one to octave since in MIDI octave 0 would be ocatve -1 in music.
+    # Need to add one to octave since in MIDI octave 0 would be octave -1 in music.
     octave = int(octave) + 1
     note_offset = get_note_offset(root=chord, accidental=accidental)
     # Figure out the value of the base MIDI note, since once we have 
@@ -231,7 +231,7 @@ def saw(frequency=440.0, amplitude=0.5, gate=1) -> None:
     intended when using SuperCollider.  I've attempted to help with
     this by adding a Limiter UGen to this SynthDef.  Depending on your
     OS, audio hardware, and possibly a few other factors, this might
-    set the volume too low to be heard.  If so, first adjust the Limter's
+    set the volume too low to be heard.  If so, first adjust the Limiter's
     `level` argument, then adjust the SynthDef's `amplitude` argument.
     NEVER set the `level` to anything higher than 1.  YOU'VE BEEN WARNED!
 

@@ -2,7 +2,7 @@
 
 A version of arpeggio.py that uses Supriya's Clock class
 instead of patterns.  Using Clock requires more code, but
-gives a lot more fine level control over behaviour, and
+gives a lot more fine level control over behavior, and
 is more intuitive, as you can set BPM and quantization.
 
 Typical usage example:
@@ -47,7 +47,7 @@ def create_notes(chord_data: list, direction: str) -> None:
         might be None if the note is neither sharp nor flat.
 
         direction: a string indicating whether notes are played
-        in asending order, descending order, or both.
+        in ascending order, descending order, or both.
     
     Returns:
         A list of floats that represent the frequencies of the notes to play in hertz.
@@ -71,7 +71,7 @@ def create_notes(chord_data: list, direction: str) -> None:
     scale_degrees_indices = get_scale_degrees_indices(direction=direction)
     degrees_to_play = [scale_degrees[x] for x in scale_degrees_indices]
 
-    # Need to add one to octave since in MIDI octave 0 would be ocatve -1 in music.
+    # Need to add one to octave since in MIDI octave 0 would be octave -1 in music.
     octave = int(octave) + 1
     note_offset = get_note_offset(root=chord, accidental=accidental)
     # Figure out the value of the base MIDI note, since once we have 
@@ -170,7 +170,7 @@ def verify_arp_direction(direction: str) -> None:
 
     Args:
         direction: a string indicating whether notes are played
-        in asending order, descending order, or both.
+        in ascending order, descending order, or both.
     """
     direction_regex = re.compile(r"^(up|down|up-and-down)$")
     if not direction_regex.fullmatch(direction):
@@ -189,7 +189,7 @@ def verify_chord(chord: str) -> None:
     chord_regex = re.compile(r"^[A-G](#|b)?[Mm][0-8]$")
     if not chord_regex.fullmatch(chord):
         print(f'Incorrect chord provided {chord}.')
-        print("Please provide the chord in the folowing format: ")
+        print("Please provide the chord in the following format: ")
         print("A-G, optional # or b, M or m, 0-8.  Example: BbM5")
         sys.exit(1)
 
@@ -206,7 +206,7 @@ def start(bpm: int, quantization: str, chord: str, direction: str, repetitions: 
         bpm: beats per minute
         quantization: a string indication what rhythmic value each note in the arpeggio should have
         chord: a string in the form C#m4 that decides what the played notes will be
-        direction: a string indicating whether notes are played in asending order, descending order, or both.
+        direction: a string indicating whether notes are played in ascending order, descending order, or both.
         repetitions: how many times the arpeggio should play. 0 means to play infinitely.
     """
     global iterations
@@ -278,8 +278,8 @@ def initialize(bpm: int, quantization: str) -> None:
 def play_note(note: float) -> None:
     """Create a synth, which automatically plays the note.
 
-    Synths in SuperCollider can be persistant, but are gnerally treated
-    as ephermal objects.  They are highly optimized in SuperCollider's
+    Synths in SuperCollider can be persistent, but are generally treated
+    as ephemeral objects.  They are highly optimized in SuperCollider's
     server so that creating many in a short time is efficient.
     """
     global server
@@ -297,7 +297,7 @@ def saw(frequency=440.0, amplitude=0.5) -> None:
     intended when using SuperCollider.  I've attempted to help with
     this by adding a Limiter UGen to this SynthDef.  Depending on your
     OS, audio hardware, and possibly a few other factors, this might
-    set the volume too low to be heard.  If so, first adjust the Limter's
+    set the volume too low to be heard.  If so, first adjust the Limiter's
     `level` argument, then adjust the SynthDef's `amplitude` argument.
     NEVER set the `level` to anything higher than 1.  YOU'VE BEEN WARNED!
 
@@ -310,7 +310,7 @@ def saw(frequency=440.0, amplitude=0.5) -> None:
     signal = Limiter.ar(duration=0.01, level=0.1, source=signal)
     
     # Using a percussive envelope and setting the done_action to 2
-    # means that SuperCollider will handle deallocating eveyrything
+    # means that SuperCollider will handle deallocating everything
     # for us.  No gate is needed.
     env = EnvGen.kr(envelope=Envelope.percussive(), done_action=2)
     signal *= env
@@ -321,7 +321,7 @@ def start_arpeggiator() -> None:
     """Start the arpeggiator by cueing the callback on the clock."""
     global clock_event_id
 
-    # Set the arpegiator to begin playing on the next quarter note.
+    # Set the arpeggiator to begin playing on the next quarter note.
     clock_event_id = clock.cue(procedure=arpeggiator_clock_callback, quantization='1/4')
 
 def stop_arpeggiator() -> None:
@@ -336,7 +336,7 @@ def stop_arpeggiator() -> None:
     exit(0)
 
 def verify_bpm(bpm: int) -> None:
-    """Make sure the BPM is in a resaonable range.
+    """Make sure the BPM is in a reasonable range.
 
     Args:
         bpm: the beats per minute
@@ -353,7 +353,7 @@ def verify_quantization(quantization: str) -> None:
         quantization: a string in the form 1/4, 1/8T, etc.
     """
     if quantization not in get_args(Quantization):
-        print(f'Invlaid quantization {quantization}')
+        print(f'Invalid quantization {quantization}')
         print('Please provide one of the following: ')
         for q in get_args(Quantization):
             print(q)

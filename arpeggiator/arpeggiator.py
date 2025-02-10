@@ -1,3 +1,20 @@
+"""
+Copyright 2025, Andrew Clark
+
+This program is free software: you can redistribute it and/or modify 
+it under the terms of the GNU General Public License as published by 
+the Free Software Foundation, either version 3 of the License, or 
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful, 
+but WITHOUT ANY WARRANTY; without even the implied warranty of 
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the 
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License 
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+"""
+
 import re
 import sys
 from typing import Union
@@ -19,10 +36,11 @@ arpeggiator: PatternPlayer
 ####### General Python functions #######
 ########################################
 
+
 def get_note_offset(root: str, accidental: Union[str, None]) -> int:
     """Get a offset from 0 (C natural).
 
-    In order to convert something like Eb5 to a MIDI note, one thing that must 
+    In order to convert something like Eb5 to a MIDI note, one thing that must
     be known is where a note falls in the range 0-11.  This value can then be used
     with the octave and scale degree to find the corresponding MIDI note.
 
@@ -30,23 +48,23 @@ def get_note_offset(root: str, accidental: Union[str, None]) -> int:
         root: the first note (root) of a chord
         accidental: a string or None, indicates if the note is sharp (#),
         flat (b), or natural (None)
-    
+
         Returns:
             int: the offset added to the scale degree octave to find the MIDI note.
     """
     notes = [
-        'C', 
-        ('C#', 'Db'), 
-        'D', 
-        ('D#', 'Eb'), 
-        'E', 
-        'F', 
-        ('F#', 'Gb'), 
-        'G', 
-        ('G#', 'Ab'), 
-        'A', 
-        ('A#', 'Bb'), 
-        'B'
+        "C",
+        ("C#", "Db"),
+        "D",
+        ("D#", "Eb"),
+        "E",
+        "F",
+        ("F#", "Gb"),
+        "G",
+        ("G#", "Ab"),
+        "A",
+        ("A#", "Bb"),
+        "B",
     ]
 
     note_index = 0
@@ -57,10 +75,11 @@ def get_note_offset(root: str, accidental: Union[str, None]) -> int:
                 if note_accidental in note:
                     note_index = index
         else:
-            if root ==  note:
+            if root == note:
                 note_index = index
 
     return note_index
+
 
 def get_scale_degrees_indices(direction: str) -> list[int]:
     """Get a list of indices based on direction.
@@ -68,23 +87,24 @@ def get_scale_degrees_indices(direction: str) -> list[int]:
     Args:
         direction: a string indicating whether notes are played
         in ascending order, descending order, or both.
-    
+
     Returns:
         a list of ints that will be used to index an array
     """
-    if direction == 'up':
+    if direction == "up":
         return [0, 2, 4, 6]
-    elif direction == 'down':
+    elif direction == "down":
         return [6, 4, 2, 0]
     else:
         return [0, 2, 4, 6, 4, 2]
+
 
 def parse_chord(chord: str) -> list:
     """Split the chord user input into relevant parts
 
     Args:
         chord: a string in the form C#m4
-    
+
     Returns:
         The input split into a list, with None used in place
         of an accidental when one was not provided.
@@ -93,9 +113,10 @@ def parse_chord(chord: str) -> list:
     if len(split_chord) < 4:
         split_chord.insert(1, None)
 
-    split_chord[2] = 'major' if split_chord[2] == 'M' else 'minor'
+    split_chord[2] = "major" if split_chord[2] == "M" else "minor"
 
     return split_chord
+
 
 def verify_arp_direction(direction: str) -> None:
     """Verify the direction input.
@@ -106,9 +127,10 @@ def verify_arp_direction(direction: str) -> None:
     """
     direction_regex = re.compile(r"^(up|down|up-and-down)$")
     if not direction_regex.fullmatch(direction):
-        print('Incorrect direction provided.')
+        print("Incorrect direction provided.")
         print("Please provide one of 'up', 'down', or 'up-and-down'.")
         sys.exit(1)
+
 
 def verify_chord(chord: str) -> None:
     """Verify the chord input.
@@ -120,14 +142,15 @@ def verify_chord(chord: str) -> None:
     """
     chord_regex = re.compile(r"^[A-G](#|b)?[Mm][0-8]$")
     if not chord_regex.fullmatch(chord):
-        print(f'Incorrect chord provided {chord}.')
+        print(f"Incorrect chord provided {chord}.")
         print("Please provide the chord in the folowing format: ")
         print("A-G, optional # or b, M or m, 0-8.  Example: BbM5")
         sys.exit(1)
 
+
 @click.command()
-@click.option('-c', '--chord', default='CM4', type=str)
-@click.option('-d', '--direction', default='up', type=str)
+@click.option("-c", "--chord", default="CM4", type=str)
+@click.option("-d", "--direction", default="up", type=str)
 def start(chord: str, direction: str) -> None:
     arp_direction = direction.lower()
     verify_arp_direction(direction=arp_direction)
@@ -142,15 +165,17 @@ def start(chord: str, direction: str) -> None:
     while True:
         continue
 
+
 ########################################
 ###### Supriya specific functions ######
 ########################################
+
 
 def create_sequence(chord_data: list, direction: str) -> None:
     """Create the SequencePattern.
 
     Args:
-        chord_data: a list of strings specifying the chord, 
+        chord_data: a list of strings specifying the chord,
         accidental, key, and octave.  Note that the accidental
         might be None if the note is neither sharp nor flat.
 
@@ -164,8 +189,8 @@ def create_sequence(chord_data: list, direction: str) -> None:
     # to reach the note in the scale, where 0 represents the
     # starting note.
     major_minor_scale_degrees = {
-        'major': [0, 2, 4, 5, 7, 9, 11],
-        'minor': [0, 2, 3, 5, 7, 8, 10],
+        "major": [0, 2, 4, 5, 7, 9, 11],
+        "minor": [0, 2, 3, 5, 7, 8, 10],
     }
 
     chord, accidental, key, octave = chord_data
@@ -179,13 +204,13 @@ def create_sequence(chord_data: list, direction: str) -> None:
     # Need to add one to octave since in MIDI octave 0 would be octave -1 in music.
     octave = int(octave) + 1
     note_offset = get_note_offset(root=chord, accidental=accidental)
-    # Figure out the value of the base MIDI note, since once we have 
+    # Figure out the value of the base MIDI note, since once we have
     # that we can simply add the scale degree to it to find the next MIDI Note.
     base_midi_note = note_offset + (12 * int(octave))
 
     midi_notes = []
     for degree in degrees_to_play:
-        note = base_midi_note + degree 
+        note = base_midi_note + degree
         midi_notes.append(note)
 
     # SynthDefs take frequencies in hertz, not MIDI notes.
@@ -193,6 +218,7 @@ def create_sequence(chord_data: list, direction: str) -> None:
     frequencies = [midi_note_number_to_frequency(x) for x in midi_notes]
     # Finally create the SequencePlayer
     arpeggiator_sequence = SequencePattern(frequencies, iterations=None)
+
 
 def create_arpeggiator() -> None:
     """Create an EventPattern."""
@@ -206,6 +232,7 @@ def create_arpeggiator() -> None:
         duration=0.0625,
     )
 
+
 def initialize() -> None:
     """Boot the server, and load the SynthDef."""
     global server
@@ -214,17 +241,19 @@ def initialize() -> None:
     # Wait for the server to fully load the SynthDef before proceeding.
     server.sync()
 
+
 def play_arpeggiator() -> None:
     """Create a PatternPlayer, and play it."""
     global arpeggiator_pattern
     global arpeggiator
     global server
-    
+
     arpeggiator = arpeggiator_pattern.play(context=server)
+
 
 @synthdef()
 def saw(frequency=440.0, amplitude=0.5, gate=1) -> None:
-    """Create a SynthDef.  SynthDefs are used to create Synth instances 
+    """Create a SynthDef.  SynthDefs are used to create Synth instances
     that play the notes.
 
     WARNING: It is very easy to end up with a volume MUCH higher than
@@ -243,24 +272,26 @@ def saw(frequency=440.0, amplitude=0.5, gate=1) -> None:
     signal = LFSaw.ar(frequency=[frequency, frequency - 2])
     signal *= amplitude
     signal = Limiter.ar(duration=0.01, level=0.1, source=signal)
-    
+
     adsr = Envelope.adsr()
     env = EnvGen.kr(envelope=adsr, gate=gate, done_action=2)
     signal *= env
 
     Out.ar(bus=0, source=signal)
 
+
 def stop_arpeggiator() -> None:
     """Stop the PatternPlayer.
 
-    This isn't being called, since I'm just killing the program 
+    This isn't being called, since I'm just killing the program
     with Ctrl-C. However, if you want to handle exiting the
-    program more gracefully, you could use this function as 
+    program more gracefully, you could use this function as
     part of that.
     """
     global arpeggiator
-    
+
     arpeggiator.stop()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     start()

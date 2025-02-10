@@ -5,6 +5,8 @@ name = "pypi"
 
 [packages]
 supriya = "*"
+ruff = "*"
+mypy = "*"
 
 [dev-packages]
 

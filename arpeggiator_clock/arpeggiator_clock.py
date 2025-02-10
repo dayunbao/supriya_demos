@@ -27,7 +27,7 @@ from supriya.ugens import EnvGen, Limiter, LFSaw, Out
 server: Server
 clock: Clock
 clock_event_id: int
-iterations: Union[None, int]
+iterations: int
 notes: list[float]
 quantization_delta: float
 stop_playing: bool = False
@@ -199,7 +199,16 @@ def verify_chord(chord: str) -> None:
 @click.option('-c', '--chord', default='CM4', type=str)
 @click.option('-d', '--direction', default='up', type=str)
 @click.option('-r', '--repetitions', default=0, type=int)
-def start(bpm: int, quantization: str, chord: str, direction: str, repetitions: Union[None, int]) -> None:
+def start(bpm: int, quantization: str, chord: str, direction: str, repetitions: int) -> None:
+    """Reads user input, verifies it, and starts the arpeggiator.
+
+    Args:
+        bpm: beats per minute
+        quantization: a string indication what rhythmic value each note in the arpeggio should have
+        chord: a string in the form C#m4 that decides what the played notes will be
+        direction: a string indicating whether notes are played in asending order, descending order, or both.
+        repetitions: how many times the arpeggio should play. 0 means to play infinitely.
+    """
     global iterations
     global stop_playing
 
@@ -218,7 +227,6 @@ def start(bpm: int, quantization: str, chord: str, direction: str, repetitions: 
     while True:
         if stop_playing:
             stop_arpeggiator()
-            break
 
 ########################################
 ###### Supriya specific functions ######
@@ -247,7 +255,7 @@ def arpeggiator_clock_callback(context = ClockContext, delta=0.0625, time_unit=T
     delta = quantization_delta 
     return delta, time_unit
 
-def initialize(bpm: int, quantization: float) -> None:
+def initialize(bpm: int, quantization: str) -> None:
     """Initialize the relevant Supriya objects."""
     global clock
     global clock_event_id

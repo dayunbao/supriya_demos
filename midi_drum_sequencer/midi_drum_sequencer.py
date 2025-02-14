@@ -30,10 +30,10 @@ from typing import get_args
 
 import click
 
-import mido
+from mido import get_input_names, Message, open_input
 from mido.ports import MultiPort
 
-from supriya import Server
+from supriya import Server, synthdef
 from supriya.clocks import Clock, ClockContext
 from supriya.clocks.bases import Quantization
 from supriya.clocks.ephemera import TimeUnit
@@ -58,13 +58,14 @@ from synth_defs import (
 )
 
 class SequencerMode(Enum):
+    # Used to track the current state of the sequencer
     IMPROVISE = 0
     PLAYBACK = 1
     RECORD = 2
 
 clock: Clock
 clock_event_id: int
-midi_channel_to_synthdef = [
+midi_channel_to_synthdef: list[synthdef] = [
     bass_drum,
     snare,
     low_tom,
@@ -84,9 +85,9 @@ midi_channel_to_synthdef = [
 ]
 multi_inport: MultiPort
 quantization_delta: float
-recorded_notes: dict[float, list[mido.Message]] = defaultdict(list)
+recorded_notes: dict[float, list[Message]] = defaultdict(list)
 sequencer_mode: Enum = SequencerMode.IMPROVISE
-SEQUENCER_STEPS = 16
+SEQUENCER_STEPS: int = 16
 server: Server
 stop_listening_for_input: threading.Event = threading.Event()
 
@@ -97,36 +98,44 @@ stop_listening_for_input: threading.Event = threading.Event()
 
 def consume_keyboard_input():
     """Starts the thread that receives user keyboard input."""
+    global recorded_notes
     global sequencer_mode
     global stop_listening_for_input
 
     input_prompt = 'Enter a command:\n'
 
     while not stop_listening_for_input.is_set():
-        input_options = 'Options are:\n*Improvise\n*Playback\n*Record\n*Exit\n> '
+        input_options = 'Options are:\n*Improvise\n*Playback\n*Record\n*Exit\n'
 
-        print(f'sequencer_mode = {sequencer_mode}')
+        if sequencer_mode == SequencerMode.PLAYBACK:
+            input_options = 'Options are:\n*Stop\n*Exit\n'
 
-        if sequencer_mode == SequencerMode.PLAYBACK or sequencer_mode == SequencerMode.RECORD:
-            input_options = 'Options are:\n*Stop\n*Exit\n> '
+        if sequencer_mode == SequencerMode.RECORD:
+            input_options = 'Options are:\n*Stop\n*Clear\n*Exit\n'
 
-        command = input(f'{input_prompt}(Current mode is {SequencerMode(sequencer_mode).name})\n{input_options}')
+        command = input(f'{input_prompt}(Current mode is {SequencerMode(sequencer_mode).name})\n{input_options}> ')
         command = command.upper()
         
         if command == "STOP":
             if sequencer_mode == SequencerMode.PLAYBACK:
                 stop_playback()
             
+            # Set mode to IMPROVISE when stopping either PLAYBACK or RECORD.
             sequencer_mode = SequencerMode.IMPROVISE
         
+        if command == "CLEAR":
+            # Delete all recorded notes.
+            recorded_notes = defaultdict(list)
+
         if command == "EXIT":
+            # Quit the program.
             stop()
         
         if command not in SequencerMode.__members__:
-                print('Incorrect command.  Please try again')
+                print('Incorrect command.  Please try again.')
         else:
             if sequencer_mode == SequencerMode[command]:
-                # No need to reassign
+                # No need to reassign.
                 continue
             
             if sequencer_mode == SequencerMode.PLAYBACK and SequencerMode[command] != SequencerMode.PLAYBACK:
@@ -170,11 +179,11 @@ def verify_bpm(bpm: int) -> None:
     """Make sure the BPM is in a reasonable range.
 
     Args:
-        bpm: the beats per minute
+        bpm: the beats per minute.
     """
     if bpm < 60 or bpm > 220:
-        print(f'Invalid bpm {bpm}')
-        print('Please enter a BPM in the range 60-220')
+        print(f'Invalid bpm {bpm}.')
+        print('Please enter a BPM in the range 60-220.')
         sys.exit(1)
 
 def verify_quantization(quantization: str) -> None:
@@ -184,7 +193,7 @@ def verify_quantization(quantization: str) -> None:
         quantization: a string in the form 1/4, 1/8T, etc.
     """
     if quantization not in get_args(Quantization):
-        print(f'Invalid quantization {quantization}')
+        print(f'Invalid quantization {quantization}.')
         print('Please provide one of the following: ')
         for q in get_args(Quantization):
             print(q)
@@ -202,10 +211,10 @@ def open_multi_inport() -> None:
     """
     global multi_inport
     
-    inports = [mido.open_input(p) for p in mido.get_input_names()]
+    inports = [open_input(p) for p in get_input_names()]
     multi_inport = MultiPort(inports)
 
-def handle_midi_message(message: mido.Message) -> None:
+def handle_midi_message(message: Message) -> None:
     """Deal with a new MIDI message.
 
     This function currently only handles Note On messages.
@@ -265,7 +274,7 @@ def listen_for_midi_messages() -> None:
         for message in multi_inport.iter_pending():
             handle_midi_message(message=message)
 
-def on_note_on(message: mido.Message) -> None:
+def on_note_on(message: Message) -> None:
     """Handle MIDI Note On messages.
 
     The MIDI channel need to be different for each drum.

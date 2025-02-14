@@ -1,7 +1,11 @@
-"""Play incoming MIDI Note On and Note Off messages.
+"""A simple drum machine with a 16-step sequencer.
 
-This script creates a polyphonic synthesizer.  So
-multiple notes can be played simultaneously.
+This script creates a a drum machine that is able to 
+sequence up to 16 steps and play them back.
+
+Typical usage example:
+
+  python midi_drum_sequencer.py -b 60
 
 Copyright 2025, Andrew Clark
 
@@ -29,12 +33,12 @@ import click
 import mido
 from mido.ports import MultiPort
 
-from supriya import Envelope, Server, synthdef, Synth
+from supriya import Server
 from supriya.clocks import Clock, ClockContext
 from supriya.clocks.bases import Quantization
 from supriya.clocks.ephemera import TimeUnit
 
-from .synth_defs import (
+from synth_defs import (
     bass_drum,
     clap_dry,
     claves,
@@ -96,21 +100,40 @@ def consume_keyboard_input():
     global sequencer_mode
     global stop_listening_for_input
 
+    input_prompt = 'Enter a command:\n'
+
     while not stop_listening_for_input.is_set():
-        command = input('Enter a command:\nOptions are:\n*Improvise\n*Playback\n*Record\n*Exit\n> ')
+        input_options = 'Options are:\n*Improvise\n*Playback\n*Record\n*Exit\n> '
+
+        print(f'sequencer_mode = {sequencer_mode}')
+
+        if sequencer_mode == SequencerMode.PLAYBACK or sequencer_mode == SequencerMode.RECORD:
+            input_options = 'Options are:\n*Stop\n*Exit\n> '
+
+        command = input(f'{input_prompt}(Current mode is {SequencerMode(sequencer_mode).name})\n{input_options}')
         command = command.upper()
+        
+        if command == "STOP":
+            if sequencer_mode == SequencerMode.PLAYBACK:
+                stop_playback()
+            
+            sequencer_mode = SequencerMode.IMPROVISE
+        
         if command == "EXIT":
             stop()
         
         if command not in SequencerMode.__members__:
                 print('Incorrect command.  Please try again')
         else:
-            if sequencer_mode == SequencerMode[command].value:
+            if sequencer_mode == SequencerMode[command]:
                 # No need to reassign
                 continue
             
-            sequencer_mode = SequencerMode[command].value
-        
+            if sequencer_mode == SequencerMode.PLAYBACK and SequencerMode[command] != SequencerMode.PLAYBACK:
+                stop_playback()
+
+            sequencer_mode = SequencerMode[command]
+
         if sequencer_mode == SequencerMode.PLAYBACK:
             start_playback()
 
@@ -120,15 +143,15 @@ def listen_for_keyboard_input():
     consumer_thread.start()
 
 @click.command()
-@click.option('-b', '--bpm', default=120, type=int)
-@click.option('-q', '--quantization', default='1/16', type=str)
+@click.option('-b', '--bpm', default=120, type=int, help='Beats per minute.')
+@click.option('-q', '--quantization', default='1/16', type=str, help='The rhythmic value for sequenced notes.')
 def start(bpm: int, quantization: str) -> None:
     verify_bpm(bpm=bpm)
     verify_quantization(quantization=quantization)
 
     listen_for_keyboard_input()
 
-    initialize_supriya(quantization=quantization)
+    initialize_supriya(bpm=bpm, quantization=quantization)
     open_multi_inport()
     listen_for_midi_messages()
 
@@ -137,7 +160,7 @@ def stop() -> None:
     global multi_inport
     global server
 
-    print('Exiting MIDI Synth Sequencer')
+    print('Exiting MIDI Drum Sequencer')
     multi_inport.close()
     stop_listening_for_input.set()
     server.quit()
@@ -185,8 +208,7 @@ def open_multi_inport() -> None:
 def handle_midi_message(message: mido.Message) -> None:
     """Deal with a new MIDI message.
 
-    This function currently only handles Note On and Note Off 
-    messages.
+    This function currently only handles Note On messages.
 
     Args:
         message: a MIDI message.
@@ -196,12 +218,9 @@ def handle_midi_message(message: mido.Message) -> None:
     if message.type == 'note_on':
         on_note_on(message=message)
 
-    if message.type == 'note_off':
-        on_note_off(message=message)
-
-def initialize_supriya(quantization: str) -> None:
+def initialize_supriya(bpm: int, quantization: str) -> None:
     """Initialize the relevant Supriya objects."""
-    global beats_per_minute
+    global clock
     global quantization_delta
     global server
     
@@ -229,7 +248,7 @@ def initialize_supriya(quantization: str) -> None:
 
     clock = Clock()
     # Set the BPM of the clock
-    clock.change(beats_per_minute=beats_per_minute)
+    clock.change(beats_per_minute=bpm)
     # This helper function converts a string like '1/16' into a numeric value
     # used by the clock.
     quantization_delta = clock.quantization_to_beats(quantization=quantization)
@@ -246,27 +265,39 @@ def listen_for_midi_messages() -> None:
         for message in multi_inport.iter_pending():
             handle_midi_message(message=message)
 
-def on_note_off(message: mido.Message) -> None:
-    global quantization_delta
-    global recorded_notes
-    global sequencer_mode
-
-    if sequencer_mode == SequencerMode.RECORD:
-        recorded_time = message.note * quantization_delta + quantization_delta
-        recorded_message = message.copy(time=recorded_time)
-        recorded_notes[recorded_time].append(recorded_message)
-
 def on_note_on(message: mido.Message) -> None:
+    """Handle MIDI Note On messages.
+
+    The MIDI channel need to be different for each drum.
+    It also need to be in the range 0-15, as the channel
+    is used as an index into an array of SYnthDefs.
+
+    There is no restriction on the MIDI note value,
+    other than it be in the usual 0-127 MIDI note range.
+    Whatever the value, it will be converted into 
+    the range 0-15.  This is done so that each MIDI
+    note value corresponds to a 1/6th note.
+
+    Args:
+        message: a MIDI Note On message.
+    """
     global midi_channel_to_synthdef
     global quantization_delta
     global recorded_notes
     global sequencer_mode
+    global SEQUENCER_STEPS
     
+    # Use the MIDI channel as the index into an array of SynthDefs
+    # to choose the right one.
     drum_synthdef = midi_channel_to_synthdef[message.channel]
     _ = server.add_synth(synthdef=drum_synthdef)
 
     if sequencer_mode == SequencerMode.RECORD:
-        recorded_time = message.note * quantization_delta
+        # recorded_time is in a factor of quantization_delta, and is based
+        # on the scaled value of the message's note.
+        # This makes playback very simple because for each invocation of 
+        # the clock's callback, we can simply check for messages at the delta.
+        recorded_time = (message.note % (SEQUENCER_STEPS - 1)) * quantization_delta
         recorded_message = message.copy(time=recorded_time)
         recorded_notes[recorded_time].append(recorded_message)
 
@@ -283,10 +314,9 @@ def sequencer_clock_callback(context = ClockContext, delta=0.0625, time_unit=Tim
     global recorded_notes
     global SEQUENCER_STEPS
 
-    if context.event.invocations == SEQUENCER_STEPS - 1:
-        stop_playback()
+    recorded_notes_index = delta * (context.event.invocations % SEQUENCER_STEPS )
 
-    midi_messages = recorded_notes[delta]
+    midi_messages = recorded_notes[recorded_notes_index]
     for message in midi_messages:
         handle_midi_message(message)
     
@@ -294,12 +324,14 @@ def sequencer_clock_callback(context = ClockContext, delta=0.0625, time_unit=Tim
     return delta, time_unit
 
 def start_playback() -> None:
+    """Start playing back the sequenced drum pattern."""
     global clock
     global clock_event_id
     
     clock_event_id = clock.cue(procedure=sequencer_clock_callback, quantization='1/4')
 
 def stop_playback() -> None:
+    """Stop playing back the sequenced drum pattern."""
     global clock
 
     clock.cancel(clock_event_id)

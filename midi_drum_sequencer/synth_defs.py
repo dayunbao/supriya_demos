@@ -1,3 +1,27 @@
+"""A collection of SynthDefs the mimic TR-808 drums.
+
+Adapted to Supriya by me from Yoshinosuke Horiuchi's 
+sclang implementation that can be found here for free:
+https://www.patreon.com/posts/sc-808-free-40121526
+
+Props to Yoshinosuke Horiuchi for sharing this!
+
+Copyright 2025, Andrew Clark
+
+This program is free software: you can redistribute it and/or modify 
+it under the terms of the GNU General Public License as published by 
+the Free Software Foundation, either version 3 of the License, or 
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful, 
+but WITHOUT ANY WARRANTY; without even the implied warranty of 
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the 
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License 
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+"""
+
 from math import pi
 
 from supriya import Envelope, synthdef
@@ -26,10 +50,10 @@ def bass_drum(
     amplitude=0.5,
     out_bus=0,
 ) -> None:
-    env = EnvGen.kr(envelope=Envelope(amplitudes=[0.11, 1, 0], durations=[0, 30], curves=-225), done_action=2)
-    trienv = EnvGen.kr(envelope=Envelope(amplitudes=[0.11, 0.6, 0], durations=[0, 30], curves=-230), done_action=0)
-    fenv = EnvGen.kr(envelope=Envelope(amplitudes=[56*7, 56*1.35, 56], durations=[0.05, 0.6], curves=-14))
-    pfenv = EnvGen.kr(envelope=Envelope(amplitudes=[56*7, 56*1.35, 56], durations=[0.03, 0.6], curves=-10))
+    env = EnvGen.kr(envelope=Envelope(amplitudes=[0.11, 1, 0], durations=[0, 30], curves=[-225.0]), done_action=2)
+    trienv = EnvGen.kr(envelope=Envelope(amplitudes=[0.11, 0.6, 0], durations=[0, 30], curves=[-230.0]), done_action=0)
+    fenv = EnvGen.kr(envelope=Envelope(amplitudes=[56*7, 56*1.35, 56], durations=[0.05, 0.6], curves=[-14.0]))
+    pfenv = EnvGen.kr(envelope=Envelope(amplitudes=[56*7, 56*1.35, 56], durations=[0.03, 0.6], curves=[-10.0]))
     
     sig = SinOsc.ar(frequency=fenv, phase=pi/2) * env
     sub = LFTri.ar(frequency=fenv, initial_phase=pi/2) * trienv * 0.05
@@ -57,7 +81,7 @@ def snare(
     noise = noise * noiseEnv * snappy
     osc1 = SinOsc.ar(frequency=tone_2, phase=pi/2) * 0.6
     osc2 = SinOsc.ar(frequency=tone, phase=pi/2) * 0.7
-    sum = (osc1+osc2) * atkEnv * amplitude_2
+    sum = (osc1 + osc2) * atkEnv * amplitude_2
     sig = Pan2.ar(source=(noise + sum) * amplitude * 2.5, position=0.0)
     sig = HPF.ar(source=sig, frequency=340)
     Out.ar(bus=out_bus, source=sig)
@@ -67,7 +91,7 @@ def clap_dry(
     amplitude=0.5, 
     out_bus=0,
 ) -> None:
-    atkenv = EnvGen.kr(envelope=Envelope(amplitudes=[0.5,1,0],durations=[0, 0.3], curves=-160), done_action=2)
+    atkenv = EnvGen.kr(envelope=Envelope(amplitudes=[0.5,1,0], durations=[0, 0.3], curves=[-160.0]), done_action=2)
     denv = EnvGen.kr(envelope=Envelope.adsr(0, 6, 0, 1, 1, curve=-157), done_action=0)
     atk = WhiteNoise.ar() * atkenv * 1.4
     decay = DelayN.ar(source=WhiteNoise.ar(), maximum_delay_time=0.026, delay_time=0.026) * denv
@@ -77,24 +101,12 @@ def clap_dry(
     Out.ar(bus=out_bus, source=Pan2.ar(source=sum * 1.5, position=0))
 
 @synthdef()
-def clap_reverb(
-    amplitude=0.5, 
-    gate=0,
-    out_bus=0,
-) -> None:
-    revgen = EnvGen.kr(envelope=Envelope.percussive(0.1, 4, curve=-9), gate=gate, done_action=2)
-    reverb = WhiteNoise.ar() * revgen * 0.02
-    reverb = HPF.ar(source=reverb, frequency=500)
-    reverb = LPF.ar(source=reverb, frequency=1000)
-    Out.ar(bus=out_bus, source=Pan2.ar(source=reverb * amplitude, position=0.0))
-
-@synthdef()
 def low_tom(
     amplitude=0.5, 
     out_bus=0
 ) -> None:
-    env = EnvGen.kr(envelope=Envelope([0.4, 1, 0], [0, 20], -250), done_action=2)
-    fenv = EnvGen.kr(envelope=Envelope([80*1.25, 80*1.125, 80], [0.1, 0.5], -4))
+    env = EnvGen.kr(envelope=Envelope(amplitudes=[0.4, 1, 0], durations=[0, 20], curves=[-250]), done_action=2)
+    fenv = EnvGen.kr(envelope=Envelope(amplitudes=[80*1.25, 80*1.125, 80], durations=[0.1, 0.5], curves=[-4.0]))
     sig = SinOsc.ar(frequency=fenv, phase=pi/2) * env
     sig = Pan2.ar(source=sig * amplitude * 3, position=0.0)
     Out.ar(bus=out_bus, source=sig)
@@ -104,8 +116,8 @@ def medium_tom(
     amplitude=0.5, 
     out_bus=0
 ) -> None:
-    env = EnvGen.kr(envelope=Envelope([0.4, 1, 0], [0, 16], -250), done_action=2)
-    fenv = EnvGen.kr(envelope=Envelope([120*1.33333, 120*1.125, 120], [0.1, 0.5], -4))
+    env = EnvGen.kr(envelope=Envelope(amplitudes=[0.4, 1, 0], durations=[0, 16], curves=[-250.0]), done_action=2)
+    fenv = EnvGen.kr(envelope=Envelope(amplitudes=[120*1.33333, 120*1.125, 120], durations=[0.1, 0.5], curves=[-4.0]))
     sig = SinOsc.ar(frequency=fenv, phase=pi/2)
     sig = Pan2.ar(source=sig * env * amplitude * 2, position=0.0)
     Out.ar(bus=out_bus, source=sig)
@@ -115,8 +127,8 @@ def high_tom(
     amplitude=0.5, 
     out_bus=0
 ) -> None:
-    env = EnvGen.kr(envelope=Envelope([0.4, 1, 0], [0, 11], -250), done_action=2)
-    fenv = EnvGen.kr(envelope=Envelope([165*1.333333, 165*1.121212, 165], [0.1, 0.5], -4))
+    env = EnvGen.kr(envelope=Envelope(amplitudes=[0.4, 1, 0], durations=[0, 11], curves=[-250.0]), done_action=2)
+    fenv = EnvGen.kr(envelope=Envelope(amplitudes=[165*1.333333, 165*1.121212, 165], durations=[0.1, 0.5], curves=[-4.0]))
     sig = SinOsc.ar(frequency=fenv, phase=pi/2)
     sig = Pan2.ar(source=sig * env * amplitude * 2, position=0.0)
     Out.ar(bus=out_bus, source=sig)
@@ -126,8 +138,8 @@ def low_conga(
     amplitude=0.5, 
     out_bus=0
 ) -> None:
-    env = EnvGen.kr(envelope=Envelope([0.15, 1, 0], [0, 18], -250), done_action=2)
-    fenv = EnvGen.kr(envelope=Envelope([165*1.333333, 165*1.121212, 165], [0.1, 0.5], -4))
+    env = EnvGen.kr(envelope=Envelope(amplitudes=[0.15, 1, 0], durations=[0, 18], curves=[-250.0]), done_action=2)
+    fenv = EnvGen.kr(envelope=Envelope(amplitudes=[165*1.333333, 165*1.121212, 165], durations=[0.1, 0.5], curves=[-4.0]))
     sig = SinOsc.ar(frequency=fenv, phase=pi/2) * env
     sig = Pan2.ar(source=sig * amplitude * 3, position=0.0)
     Out.ar(bus=out_bus, source=sig)
@@ -137,8 +149,8 @@ def medium_conga(
     amplitude=0.5, 
     out_bus=0
 ) -> None:
-    env = EnvGen.kr(envelope=Envelope([0.15, 1, 0], [0, 9], -250), done_action=2)
-    fenv = EnvGen.kr(envelope=Envelope([250*1.24, 250*1.12, 250], [0.1, 0.5], -4))
+    env = EnvGen.kr(envelope=Envelope(amplitudes=[0.15, 1, 0], durations=[0, 9], curves=[-250.0]), done_action=2)
+    fenv = EnvGen.kr(envelope=Envelope(amplitudes=[250*1.24, 250*1.12, 250], durations=[0.1, 0.5], curves=[-4.0]))
     sig = SinOsc.ar(frequency=fenv, phase=pi/2)
     sig = Pan2.ar(source=sig * env * amplitude * 2, position=0)
     Out.ar(bus=out_bus, source=sig)
@@ -148,8 +160,8 @@ def high_conga(
     amplitude=0.5, 
     out_bus=0
 ) -> None:
-    env = EnvGen.kr(envelope=Envelope([0.15, 1, 0], [0, 6], -250), done_action=2)
-    fenv = EnvGen.kr(envelope=Envelope([370*1.22972, 370*1.08108, 370], [0.1, 0.5], -4))
+    env = EnvGen.kr(envelope=Envelope(amplitudes=[0.15, 1, 0], durations=[0, 6], curves=[-250.0]), done_action=2)
+    fenv = EnvGen.kr(envelope=Envelope(amplitudes=[370*1.22972, 370*1.08108, 370], durations=[0.1, 0.5], curves=[-4.0]))
     sig = SinOsc.ar(frequency=fenv, phase=pi/2)
     sig = Pan2.ar(source=sig * env * amplitude * 2, position=0.0)
     Out.ar(bus=out_bus, source=sig)
@@ -159,7 +171,7 @@ def rim_shot(
     amplitude=0.5, 
     out_bus=0
 ) -> None:
-    env = EnvGen.kr(envelope=Envelope([1, 1, 0], [0.00272, 0.07], -42), done_action=2)
+    env = EnvGen.kr(envelope=Envelope(amplitudes=[1, 1, 0], durations=[0.00272, 0.07], curves=[-42.0]), done_action=2)
     tri1 = LFTri.ar(frequency=1667 * 1.1, initial_phase=1) * env
     tri2 = LFPulse.ar(frequency=455 * 1.1, width=0.8) * env
     punch = WhiteNoise.ar() * env * 0.46
@@ -175,7 +187,7 @@ def claves(
     amplitude=0.5, 
     out_bus=0
 ) -> None:
-    env = EnvGen.kr(envelope=Envelope([1, 1, 0], [0, 0.1], -20), done_action=2)
+    env = EnvGen.kr(envelope=Envelope(amplitudes=[1, 1, 0], durations=[0, 0.1], curves=[-20.0]), done_action=2)
     sig = SinOsc.ar(frequency=2500, phase=pi/2) * env * amplitude
     sig = Pan2.ar(source=sig, position=0.0)
     Out.ar(bus=out_bus, source=sig)
@@ -185,7 +197,7 @@ def maracas(
     amplitude=0.5, 
     out_bus=0
 ) -> None:
-    env = EnvGen.kr(envelope=Envelope([0.3, 1, 0], [0.027, 0.07], -250), done_action=2)
+    env = EnvGen.kr(envelope=Envelope(amplitudes=[0.3, 1, 0], durations=[0.027, 0.07], curves=[-250.0]), done_action=2)
     sig = WhiteNoise.ar() * env * amplitude
     sig = HPF.ar(source=sig, frequency=5500)
     sig = Pan2.ar(source=sig, position=0.0)
@@ -196,8 +208,8 @@ def cow_bell(
     amplitude=0.5, 
     out_bus=0
 ) -> None:
-    atkenv = EnvGen.kr(envelope=Envelope.percussive(0, 1, 1, -215), done_action=0)
-    env = EnvGen.kr(envelope=Envelope.percussive(0.01, 9.5, 1, -90), done_action=2)
+    atkenv = EnvGen.kr(envelope=Envelope.percussive(0, 1, 1, -215.0), done_action=0)
+    env = EnvGen.kr(envelope=Envelope.percussive(0.01, 9.5, 1, -90.0), done_action=2)
     pul1 = LFPulse.ar(frequency=811.16)
     pul2 = LFPulse.ar(frequency=538.75)
     atk = (pul1 + pul2) * atkenv * 6
@@ -238,7 +250,7 @@ def open_high_hat(
     out_bus=0,
 ) -> None:
     env1 = EnvGen.kr(envelope=Envelope.percussive(0.1, 0.5, curve=-3), done_action=2)
-    env2 = EnvGen.kr(envelope=Envelope([0, 1, 0], [0, 0.5*5], curves=-150), done_action=0)
+    env2 = EnvGen.kr(envelope=Envelope(amplitudes=[0, 1, 0], durations=[0, 0.5*5], curves=[-150.0]), done_action=0)
     osc1 = LFPulse.ar(frequency=203.52) * 0.6
     osc2 = LFPulse.ar(frequency=366.31) * 0.6
     osc3 = LFPulse.ar(frequency=301.77) * 0.6
@@ -266,9 +278,9 @@ def cymbal(
     tone=0.002,
 ) -> None:
     env1 = EnvGen.kr(envelope=Envelope.percussive(0.3, 2.0, curve=-3), done_action=2)
-    env2 = EnvGen.kr(envelope=Envelope([0, 0.6, 0], [0.1, 2.0*0.7], -5), done_action=0)
-    env2b = EnvGen.kr(envelope=Envelope([0, 0.3, 0], [0.1, 2.0*20], -120), done_action=0)
-    env3 = EnvGen.kr(envelope=Envelope([0, 1, 0], [0, 2.0*5], curves=-150), done_action=0)
+    env2 = EnvGen.kr(envelope=Envelope(amplitudes=[0, 0.6, 0], durations=[0.1, 2.0*0.7], curves=[-5.0]), done_action=0)
+    env2b = EnvGen.kr(envelope=Envelope(amplitudes=[0, 0.3, 0], durations=[0.1, 2.0*20], curves=[-120.0]), done_action=0)
+    env3 = EnvGen.kr(envelope=Envelope(amplitudes=[0, 1, 0], durations=[0, 2.0*5], curves=[-150.0]), done_action=0)
 
     osc1 = LFPulse.ar(frequency=203.52) * 0.6
     osc2 = LFPulse.ar(frequency=366.31) * 0.6

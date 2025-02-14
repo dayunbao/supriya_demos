@@ -1,4 +1,4 @@
-"""A collection of SynthDefs the mimic TR-808 drums.
+"""A collection of SynthDefs that mimic the TR-808's drums.
 
 Adapted to Supriya by me from Yoshinosuke Horiuchi's 
 sclang implementation that can be found here for free:

@@ -26,14 +26,32 @@ from supriya.conversions import midi_note_number_to_frequency
 
 from synth_defs import delay, reverb, saw
 
+DELAY_CC_NUM: int = 0
 delay_synth: Synth
 effects_group: Group
 multi_inport: MultiPort
 notes: dict[int, Synth] = {}
 delay_bus: Bus
+REVERB_CC_NUM: int = 1
 reverb_synth: Synth
 server: Server
 synth_group: Group
+
+def scale_float(value: int, target_min: float, target_max: float):
+    """
+    Linearly scale a value from one range to another.
+
+    Args:
+        source_value (float): The value to be scaled.
+
+    Returns:
+        float: The scaled value in the target range.
+    """
+    source_min = 0
+    source_max = 127
+    
+    scaled_value = (value - source_min) * (target_max - target_min) / (source_max - source_min) + target_min
+    return round(number=scaled_value, ndigits=2)
 
 def create_effects_synths() -> None:
     """Create the effects synths.
@@ -63,8 +81,8 @@ def create_effects_synths() -> None:
     reverb_synth = effects_group.add_synth(
         synthdef=reverb,
         in_bus=reverb_bus,
-        mix=1.0,
-        room_size=0.7,
+        mix=0.33,
+        room_size=1.0,
         damping=0.5,
         out_bus=0,
     )
@@ -95,8 +113,11 @@ def handle_midi_message(message: mido.Message) -> None:
     Args:
         message: a MIDI message.
     """
+    global DELAY_CC_NUM
     global delay_bus
+    global effects_group
     global notes
+    global REVERB_CC_NUM
     global synth_group
 
     if message.type == 'note_on':
@@ -105,9 +126,17 @@ def handle_midi_message(message: mido.Message) -> None:
         notes[message.note] = synth
 
     if message.type == 'note_off':
-        if message.note in notes:
-            notes[message.note].set(gate=0)
-            del notes[message.note]
+        notes[message.note].set(gate=0)
+        del notes[message.note]
+    
+    if message.type == 'control_change':
+        if message.is_cc(DELAY_CC_NUM):
+            scaled_decay_time = scale_float(value=message.value, target_min=0.0, target_max=10.0)
+            effects_group.set(decay_time=scaled_decay_time)
+            
+        if message.is_cc(REVERB_CC_NUM):
+            scaled_reverb_mix = scale_float(value=message.value, target_min=0.0, target_max=1.0)
+            effects_group.set(mix=scaled_reverb_mix)
 
 def initialize_supriya() -> None:
     """Initialize the relevant Supriya objects."""

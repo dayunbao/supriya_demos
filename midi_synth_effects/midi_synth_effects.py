@@ -1,7 +1,9 @@
-"""Play incoming MIDI Note On and Note Off messages.
+"""Create a polyphonic synthesizer with effects.
 
-This script creates a polyphonic synthesizer.  So
-multiple notes can be played simultaneously.
+This script builds on the midi_synth.py script by
+adding delay and reverb synths, and accepting MIDI
+Control Change messages to change some of the effects'
+parameters.
 
 Copyright 2025, Andrew Clark
 
@@ -94,7 +96,9 @@ def create_groups() -> None:
     head of the SuperCollider server, while the effects synths
     need to be at the tail.  The order of the synths, or groups,
     affects the order in which the audio signals are processed.
-    Using groups makes it easy to ensure this happens.
+    Using groups makes it easy to ensure this happens in the correct
+    order, with the sound-producing synth's audio signal being at 
+    the head, and the sound-consuming synths (effects) at the tail.
     """
     global effects_group
     global server
@@ -107,8 +111,8 @@ def create_groups() -> None:
 def handle_midi_message(message: mido.Message) -> None:
     """Deal with a new MIDI message.
 
-    This function currently only handles Note On and Note Off 
-    messages.
+    This function currently only handles Note On, Note Off 
+    and Control Change messages.
 
     Args:
         message: a MIDI message.
@@ -130,6 +134,8 @@ def handle_midi_message(message: mido.Message) -> None:
         del notes[message.note]
     
     if message.type == 'control_change':
+        # Figure out which parameter should be changed based on the 
+        # control number.
         if message.is_cc(DELAY_CC_NUM):
             scaled_decay_time = scale_float(value=message.value, target_min=0.0, target_max=10.0)
             effects_group.set(decay_time=scaled_decay_time)

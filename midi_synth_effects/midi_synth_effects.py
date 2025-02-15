@@ -110,7 +110,7 @@ def handle_midi_message(message: mido.Message) -> None:
     global synth_group
 
     if message.type == 'note_on':
-        frequency = midi_note_number_to_frequency(midi_note_number=message.note + 60)
+        frequency = midi_note_number_to_frequency(midi_note_number=message.note)
         synth = synth_group.add_synth(synthdef=saw, frequency=frequency, out_bus=delay_bus)
         notes[message.note] = synth
 

@@ -1,8 +1,5 @@
 """A simple drum machine with a 16-step sequencer.
 
-This script creates a a drum machine that is able to 
-sequence up to 16 steps and play them back.
-
 Typical usage example:
 
   python midi_drum_sequencer.py -b 60
@@ -194,7 +191,7 @@ def stop() -> None:
     multi_inport.close()
     stop_listening_for_input.set()
     server.quit()
-    # Calling this makea sure the SuperCollider server shuts down,
+    # Calling this makes sure the SuperCollider server shuts down
     # and doesn't linger after the program exits.
     sys.exit(0)
 
@@ -289,7 +286,7 @@ def initialize_supriya(bpm: int, quantization: str) -> None:
 def listen_for_midi_messages() -> None:
     """Listen for incoming MIDI messages in a non-blocking way.
     
-    mido's iter_pending() is non-blocking.
+    Mido's iter_pending() is non-blocking.
     """
     global multi_inport
 

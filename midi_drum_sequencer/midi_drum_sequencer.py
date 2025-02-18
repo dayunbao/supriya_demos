@@ -59,7 +59,7 @@ from synth_defs import (
 
 class SequencerMode(Enum):
     # Used to track the current state of the sequencer
-    IMPROVISE = 0
+    PERFORM = 0
     PLAYBACK = 1
     RECORD = 2
 
@@ -86,7 +86,7 @@ midi_channel_to_synthdef: list[synthdef] = [
 multi_inport: MultiPort
 quantization_delta: float
 recorded_notes: dict[float, list[Message]] = defaultdict(list)
-sequencer_mode: Enum = SequencerMode.IMPROVISE
+sequencer_mode: Enum = SequencerMode.PERFORM
 SEQUENCER_STEPS: int = 16
 server: Server
 stop_listening_for_input: threading.Event = threading.Event()
@@ -97,7 +97,28 @@ stop_listening_for_input: threading.Event = threading.Event()
 ########################################
 
 def consume_keyboard_input():
-    """Starts the thread that receives user keyboard input."""
+    """The thread that receives user keyboard input.
+    
+    Four options are presented to the user on the command line:
+    1) `Perform` - simply handles incoming MIDI messages
+    2) `Playback` - plays a recorded sequence of MIDI messages
+    3) `Record` - records incoming MIDI messages
+    4) `Exit` - exit the program entirely.
+    
+    The whole word must be entered when choosing a mode, but case
+    doesn't matter.
+
+    If setting the sequencer to Perform mode, two options are
+    available:
+    1) `Stop` - stop playing the recorded sequence, and change to Perform mode.
+    2) `Exit` - exit the program entirely
+
+    If setting the sequencer to Record mode, three options are
+    available:
+    1) `Stop` - stop recording a sequence, and change to Perform mode.
+    2) `Clear` - delete all recorded sequences
+    3) `Exit` - exit the program entirely
+    """
     global recorded_notes
     global sequencer_mode
     global stop_listening_for_input
@@ -105,7 +126,7 @@ def consume_keyboard_input():
     input_prompt = 'Enter a command:\n'
 
     while not stop_listening_for_input.is_set():
-        input_options = 'Options are:\n*Improvise\n*Playback\n*Record\n*Exit\n'
+        input_options = 'Options are:\n*Perform\n*Playback\n*Record\n*Exit\n'
 
         if sequencer_mode == SequencerMode.PLAYBACK:
             input_options = 'Options are:\n*Stop\n*Exit\n'
@@ -120,8 +141,8 @@ def consume_keyboard_input():
             if sequencer_mode == SequencerMode.PLAYBACK:
                 stop_playback()
             
-            # Set mode to IMPROVISE when stopping either PLAYBACK or RECORD.
-            sequencer_mode = SequencerMode.IMPROVISE
+            # Set mode to PERFORM when stopping either PLAYBACK or RECORD.
+            sequencer_mode = SequencerMode.PERFORM
         
         if command == "CLEAR":
             # Delete all recorded notes.
@@ -173,6 +194,8 @@ def stop() -> None:
     multi_inport.close()
     stop_listening_for_input.set()
     server.quit()
+    # Calling this makea sure the SuperCollider server shuts down,
+    # and doesn't linger after the program exits.
     sys.exit(0)
 
 def verify_bpm(bpm: int) -> None:
@@ -279,7 +302,7 @@ def on_note_on(message: Message) -> None:
 
     The MIDI channel need to be different for each drum.
     It also need to be in the range 0-15, as the channel
-    is used as an index into an array of SYnthDefs.
+    is used as an index into an array of SynthDefs.
 
     There is no restriction on the MIDI note value,
     other than it be in the usual 0-127 MIDI note range.
@@ -306,7 +329,7 @@ def on_note_on(message: Message) -> None:
         # on the scaled value of the message's note.
         # This makes playback very simple because for each invocation of 
         # the clock's callback, we can simply check for messages at the delta.
-        recorded_time = (message.note % (SEQUENCER_STEPS - 1)) * quantization_delta
+        recorded_time = (message.note % SEQUENCER_STEPS) * quantization_delta
         recorded_message = message.copy(time=recorded_time)
         recorded_notes[recorded_time].append(recorded_message)
 

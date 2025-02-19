@@ -107,6 +107,12 @@ def set_midi_handler(handler: MidiHandler) -> None:
 
     midi_handler = handler
 
+def set_quantization_delta(quantization: str) -> None:
+    global clock
+    global quantization_delta
+
+    quantization_delta = clock.quantization_to_beats(quantization=quantization)
+
 def set_synth_handler(handler: SynthHandler) -> None:
     global synth_handler
 

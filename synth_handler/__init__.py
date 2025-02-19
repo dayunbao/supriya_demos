@@ -15,6 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
-from synth_hanlder import SynthHandler
+from synth_handler import SynthHandler
 
 __all__ = [SynthHandler]

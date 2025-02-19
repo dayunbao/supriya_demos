@@ -66,9 +66,7 @@ class SynthHandler(ABC):
         """Handle a Control Change message.
         
         Args:
-            message: a Control Changexx]'
-             
-               Message
+            message: a Control Change message
         """
         pass
 

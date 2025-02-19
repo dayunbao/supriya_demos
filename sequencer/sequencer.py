@@ -1,3 +1,20 @@
+"""
+Copyright 2025, Andrew Clark
+
+This program is free software: you can redistribute it and/or modify 
+it under the terms of the GNU General Public License as published by 
+the Free Software Foundation, either version 3 of the License, or 
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful, 
+but WITHOUT ANY WARRANTY; without even the implied warranty of 
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the 
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License 
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+"""
+
 from collections import defaultdict
 from enum import Enum
 from sys import exit
@@ -33,9 +50,6 @@ def initialize_clock(bpm: int, quantization: str) -> None:
     global clock
     global quantization_delta
     
-    # Move outside of this module
-    # server = Server().boot()
-    
     clock = Clock()
     # Set the BPM of the clock
     clock.change(beats_per_minute=bpm)
@@ -65,24 +79,16 @@ def sequencer_clock_callback(context = ClockContext, delta=0.0625, time_unit=Tim
     you can specify SECONDS as the time_unit to have it called outside of a 
     musical rhythmic context.
     """
-    global midi_handler
     global quantization_delta
     global recorded_notes
     global SEQUENCER_STEPS
+    global synth_handler
 
     recorded_notes_index = delta * (context.event.invocations % SEQUENCER_STEPS )
 
     midi_messages = recorded_notes[recorded_notes_index]
     for message in midi_messages:
-        # Change this
-        # midi_handler.handle_midi_message(message)
-        
-        # Use the MIDI channel as the index into an array of SynthDefs
-        # to choose the right one.
-        
-        # MOve outside of module
-        # drum_synthdef = midi_channel_to_synthdef[message.channel]
-        # _ = server.add_synth(synthdef=drum_synthdef)
+        synth_handler.play_synth(message=message)
 
         if sequencer_mode == SequencerMode.RECORD:
             # recorded_time is in a factor of quantization_delta, and is based

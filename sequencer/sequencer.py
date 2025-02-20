@@ -17,17 +17,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from collections import defaultdict
 from enum import Enum
-from sys import exit
-from typing import get_args
 
 from mido import Message
 
 from supriya.clocks import Clock, ClockContext
-from supriya.clocks.bases import Quantization
 from supriya.clocks.ephemera import TimeUnit
 
 from midi_handler import MidiHandler
-from synth_hanlder import SynthHandler
+from synth_handler import SynthHandler
 
 class SequencerMode(Enum):
     # Used to track the current state of the sequencer
@@ -35,15 +32,29 @@ class SequencerMode(Enum):
     PLAYBACK = 1
     RECORD = 2
 
+bpm: int #  Need this?
 clock: Clock
 clock_event_id: int
 midi_handler: MidiHandler
 quantization_delta: float
 recorded_notes: dict[float, list[Message]] = defaultdict(list)
-sequencer_mode: Enum = SequencerMode.PERFORM
+mode: Enum = SequencerMode.PERFORM
 SEQUENCER_STEPS: int = 16
 synth_handler: SynthHandler
 
+def exit() -> None:
+    global midi_handler
+    global synth_handler
+    
+    stop_playback()
+    midi_handler.exit()
+
+def initialize(bpm: int, quantization: str, midi: MidiHandler, synth: SynthHandler) -> None:    
+    global synth_handler
+
+    synth_handler = synth
+    initialize_clock(bpm=bpm, quantization=quantization)
+    initialize_midi_handler(midi=midi)
 
 def initialize_clock(bpm: int, quantization: str) -> None:
     """Initialize the Supriya's Clock."""
@@ -58,17 +69,13 @@ def initialize_clock(bpm: int, quantization: str) -> None:
     quantization_delta = clock.quantization_to_beats(quantization=quantization)
     clock.start()
 
-def initialize_midi_handler() -> None:
+def initialize_midi_handler(midi: MidiHandler) -> None:
     global midi_handler
     global synth_handler
 
+    midi_handler = midi
     midi_handler.open_multi_inport()
-    midi_handler.set_message_handler_callback(synth_handler.play_synth)
-
-def initialize_synth_handler() -> None:
-    global synth_handler
-
-    pass
+    midi_handler.set_message_handler_callback(synth_handler.handle_midi_message)
 
 def sequencer_clock_callback(context = ClockContext, delta=0.0625, time_unit=TimeUnit.BEATS) -> tuple[float, TimeUnit]:
     """The function that runs on each invocation.
@@ -88,9 +95,9 @@ def sequencer_clock_callback(context = ClockContext, delta=0.0625, time_unit=Tim
 
     midi_messages = recorded_notes[recorded_notes_index]
     for message in midi_messages:
-        synth_handler.play_synth(message=message)
+        synth_handler.handle_midi_message(message=message)
 
-        if sequencer_mode == SequencerMode.RECORD:
+        if mode == SequencerMode.RECORD:
             # recorded_time is in a factor of quantization_delta, and is based
             # on the scaled value of the message's note.
             # This makes playback very simple because for each invocation of 
@@ -101,22 +108,6 @@ def sequencer_clock_callback(context = ClockContext, delta=0.0625, time_unit=Tim
     
     delta = quantization_delta 
     return delta, time_unit
-
-def set_midi_handler(handler: MidiHandler) -> None:
-    global midi_handler
-
-    midi_handler = handler
-
-def set_quantization_delta(quantization: str) -> None:
-    global clock
-    global quantization_delta
-
-    quantization_delta = clock.quantization_to_beats(quantization=quantization)
-
-def set_synth_handler(handler: SynthHandler) -> None:
-    global synth_handler
-
-    synth_handler = handler
 
 def start_playback() -> None:
     """Start playing back the sequenced drum pattern."""
@@ -130,25 +121,3 @@ def stop_playback() -> None:
     global clock
 
     clock.cancel(clock_event_id)
-
-def verify_bpm(bpm: int) -> None:
-    """Make sure the BPM is in a reasonable range.
-
-    Args:
-        bpm: the beats per minute.
-    """
-    if bpm < 60 or bpm > 220:
-        exit(f'Invalid bpm {bpm}.\nPlease enter a BPM in the range 60-220.')
-
-def verify_quantization(quantization: str) -> None:
-    """Make sure the quantization is one that matches what's available.
-
-    Args:
-        quantization: a string in the form 1/4, 1/8T, etc.
-    """
-    if quantization not in get_args(Quantization):
-        print(f'Invalid quantization {quantization}.')
-        print('Please provide one of the following: ')
-        for q in get_args(Quantization):
-            print(q)
-        exit(1)

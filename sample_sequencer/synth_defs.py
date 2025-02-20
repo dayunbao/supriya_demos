@@ -3,7 +3,7 @@ from supriya.enums import EnvelopeShape
 from supriya.ugens import Envelope, EnvGen, Limiter, Out, PlayBuf, Pulse, RLPF, Saw, Select
 
 @synthdef()
-def drum_sample(drum_buff):
+def sample_player(drum_buff):
     signal = PlayBuf.ar(buffer_id=drum_buff, channel_count=1, done_action=2)
     signal = Limiter.ar(duration=0.01, level=0.5, source=signal)
     Out.ar(bus=0, source=signal)

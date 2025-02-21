@@ -186,6 +186,7 @@ def stop() -> None:
     """Stop the program."""
     global multi_inport
     global server
+    global stop_listening_for_input
 
     print('Exiting MIDI Drum Sequencer')
     multi_inport.close()
@@ -242,8 +243,6 @@ def handle_midi_message(message: Message) -> None:
     Args:
         message: a MIDI message.
     """
-    global server
-
     if message.type == 'note_on':
         on_note_on(message=message)
 

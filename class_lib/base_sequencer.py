@@ -20,16 +20,10 @@ from enum import Enum
 from supriya.clocks import Clock, ClockContext
 from supriya.clocks.ephemera import TimeUnit
 
-from midi_handler import MIDIHandler
-from synth_handler import SynthHandler
+from .midi_handler import MIDIHandler
+from .synth_handler import SynthHandler
 
 class BaseSequencer(ABC):
-    class Mode(Enum):
-        # Used to track the current state of the sequencer
-        PERFORM = 0
-        PLAYBACK = 1
-        RECORD = 2
-
     def __init__(
             self, 
             bpm: int, 
@@ -40,7 +34,7 @@ class BaseSequencer(ABC):
         self.clock = self._initialize_clock()
         self.clock_event_id: int | None = None
         self.quantization_delta = self._convert_quantization_to_delta(quantization=quantization)
-        self._mode: Enum = BaseSequencer.Mode.PERFORM
+        
         self.SEQUENCER_STEPS: int = 16
         self.synth_handler = synth_handler
 
@@ -56,12 +50,9 @@ class BaseSequencer(ABC):
         pass
 
     @property
+    @abstractmethod
     def mode(self) -> None:
-        return self._mode
-    
-    @mode.setter
-    def mode(self, mode: Enum) -> None:
-        self._mode = mode
+        pass
 
     def _convert_quantization_to_delta(self, quantization: str) -> float:
         # This helper function converts a string like '1/16' into a numeric value

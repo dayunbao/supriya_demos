@@ -16,17 +16,24 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
 from collections import defaultdict
+from enum import Enum
 
 from mido import Message
 
 from supriya.clocks import ClockContext
 from supriya.clocks.ephemera import TimeUnit
 
-from midi_handler import MIDIHandler
-from base_sequencer import BaseSequencer
-from synth_handler import SynthHandler
+from class_lib import MIDIHandler
+from class_lib import BaseSequencer
+from class_lib import SynthHandler
 
 class Sequencer(BaseSequencer):
+    class Mode(Enum):
+        # Used to track the current state of the sequencer
+        PERFORM = 0
+        PLAYBACK = 1
+        RECORD = 2
+    
     def __init__(
             self, 
             bpm: int, 
@@ -36,7 +43,16 @@ class Sequencer(BaseSequencer):
         super().__init__(bpm, quantization, synth_handler)
         self._recorded_notes: dict[float, list[Message]] = defaultdict(list)
         self._midi_handler = self._initialize_midi_handler()
+        self._mode: Enum = Sequencer.Mode.PERFORM
         self.SAMPLE_COUNT = 12
+
+    @property
+    def mode(self) -> None:
+        return self._mode
+    
+    @mode.setter
+    def mode(self, mode: Enum) -> None:
+        self._mode = mode
 
     @property
     def recorded_notes(self) -> dict[float, list[Message]]:
@@ -76,7 +92,6 @@ class Sequencer(BaseSequencer):
             recorded_message = message.copy(time=recorded_time)
             self.recorded_notes[recorded_time].append(recorded_message)
 
-
     def sequencer_clock_callback(
             self, 
             context = ClockContext, 
@@ -100,6 +115,19 @@ class Sequencer(BaseSequencer):
         delta = self.quantization_delta
         return delta, time_unit
 
+    def set_mode_to_perform(self) -> None:
+        self.mode = Sequencer.Mode.PERFORM
+        self.stop_playback()
+    
+    def set_mode_to_playback(self) -> None:
+        self.mode = Sequencer.Mode.PLAYBACK
+        self.start_playback()
+    
+    def set_mode_to_record(self) -> None:
+        self.mode = Sequencer.Mode.RECORD
+        self.stop_playback()
+
     def start_playback(self) -> None:
         """Start playing back the sequenced drum pattern."""
-        self.clock_event_id = self.clock.cue(procedure=self.sequencer_clock_callback, quantization='1/4')
+        if self.clock_event_id is not None:
+            self.clock_event_id = self.clock.cue(procedure=self.sequencer_clock_callback, quantization='1/4')

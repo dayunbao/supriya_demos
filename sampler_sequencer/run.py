@@ -7,12 +7,13 @@ import click
 from supriya import Server
 from supriya.clocks.bases import Quantization
 
-from midi_handler import MIDIHandler
-from sampler import Sampler
-from sequencer import Sequencer
+from .sampler import Sampler
+from .sequencer import Sequencer
+from class_lib import Command, Menu, SubCommand, TerminalInterface
 
-from synth_defs import sample_player
+from .synth_defs import sample_player
 
+interface: TerminalInterface
 sequencer: Sequencer
 server: Server
 stop_listening_for_input: threading.Event = threading.Event()
@@ -102,6 +103,90 @@ def consume_keyboard_input():
         if sequencer.mode == Sequencer.Mode.PLAYBACK:
             sequencer.start_playback()
 
+def create_commands() -> dict[str, Command]:
+    """
+    Give Command a callback, have it change sequencer mode.
+    SubCommands' callbacks start or stop playback or recording,
+    or go BACK to main menu
+    """
+    
+    
+    global sequencer
+
+    # SHARED
+    exit_cmd = SubCommand(
+        callback=exit,
+        command_text='exit',
+    )
+
+    # PERFORM
+    perform_sub_cmds = {'exit': exit_cmd}
+
+    perform_cmd = Command(
+        command_text='perform',
+        sub_commands=perform_sub_cmds,
+    )
+
+    # PLAYBACK
+    playback_start_sub_cmd = SubCommand(
+        callback=sequencer.set_mode_to_playback,
+        command_text='start'
+    )
+
+    playback_stop_sub_cmd = SubCommand(
+        callback=sequencer.set_mode_to_perform,
+        command_text='stop'
+    )
+
+    playback_stop_sub_cmd = SubCommand(
+        callback=sequencer.set_mode_to_perform,
+        command_text='stop'
+    )
+
+    playback_sub_cmds = {
+        'stop': playback_stop_sub_cmd,
+        'exit': exit_cmd
+    }
+
+    playback_cmd = Command(
+        callback=sequencer.set_mode_to_playback,
+        command_text='playback',
+        sub_commands=playback_sub_cmds
+    )
+
+    # RECORD
+    record_stop_sub_cmd = SubCommand(
+        sequencer.set_mode_to_perform,
+        command_text='stop'
+    )
+
+    record_erase_sub_cmd = SubCommand(
+        sequencer.erase_recorded_notes,
+        command_text='erase'
+    )
+
+    record_sub_cmds = {
+        'stop': record_stop_sub_cmd,
+        'erase': record_erase_sub_cmd,
+        'exit': exit_cmd
+
+    }
+
+    record_cmd = Command(
+        command_text='playback',
+        sub_commands=record_sub_cmds
+    )
+
+    # ALL
+    commands = {
+        'perform': perform_cmd,
+        'playback': playback_cmd,
+        'record': record_cmd,
+        'exit': exit_cmd,
+    }
+
+    return commands
+
 def exit_program() -> None:
     """Exit the program."""
     global sequencer
@@ -115,6 +200,16 @@ def exit_program() -> None:
     # and doesn't linger after the program exits.
     exit(0)
 
+def initialize_interface() -> None:
+    global interface
+
+    menu = Menu(commands=create_commands())
+
+    interface = TerminalInterface(
+        menu=menu,
+        prompt='Enter a command:',
+    )
+    
 def initialize_server() -> None:
     global server
 
@@ -135,7 +230,14 @@ def start(bpm: int, quantization: str) -> None:
 
     initialize_server()
     initialize_sequencer(bpm=bpm, quantization=quantization)
-    listen_for_keyboard_input()
+    # listen_for_keyboard_input()
+    initialize_interface()
+    start_interface()
+
+def start_interface() -> None:
+    global interface
+
+    interface.listen_for_input()
 
 def verify_bpm(bpm: int) -> None:
     """Make sure the BPM is in a reasonable range.

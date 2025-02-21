@@ -4,7 +4,7 @@ from mido import Message
 
 from supriya import Buffer, Server, SynthDef
 
-from synth_handler import SynthHandler
+from class_lib import SynthHandler
 
 class Sampler(SynthHandler):
     def __init__(self, server: Server, synth_definitions: dict[str, SynthDef]):

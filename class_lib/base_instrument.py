@@ -22,24 +22,29 @@ from mido import Message
 from supriya import Server, SynthDef
 
 
-class SynthHandler(ABC):
-    def __init__(self, server: Server, synth_definitions: dict[str, SynthDef]):
-        self.server = server
-        self._synth_definitions = synth_definitions
-        self.synths = {}
+class BaseInstrument(ABC):
+    def __init__(self, server: Server, synth_definition: SynthDef ):
+        self._server = server
+        self._synth_definition = synth_definition
+        self._synths = {}
     
     @property
-    def synth_definitions(self) -> dict[str, SynthDef]:
-        return self._synth_definitions
+    @abstractmethod
+    def name(self):
+        pass
+
+    @property
+    def synth_definition(self) -> SynthDef:
+        return self._synth_definition
     
-    @synth_definitions.setter
-    def synth_definitions(self, synth_defs: dict[str, SynthDef]) -> None:
-        self._synth_definitions = synth_defs
+    @synth_definition.setter
+    def synth_definition(self, synth_def: SynthDef) -> None:
+        self._synth_definition = synth_def
     
     def _load_synthdefs(self) -> None:
-        _ = self.server.add_synthdefs(*self.synth_definitions.values())
+        _ = self._server.add_synthdefs(self.synth_definition)
         # Wait for the server to fully load the SynthDef before proceeding.
-        self.server.sync()
+        self._server.sync()
     
     @abstractmethod
     def handle_midi_message(self, message: Message) -> None:

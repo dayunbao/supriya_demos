@@ -9,6 +9,7 @@ ruff = "*"
 mypy = "*"
 mido = "*"
 python-rtmidi = "*"
+console-menu = "*"
 
 [dev-packages]
 

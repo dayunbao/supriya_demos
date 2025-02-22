@@ -1,17 +1,11 @@
+from .base_instrument import BaseInstrument
 from .base_sequencer import BaseSequencer
-from .command import Command
-from .menu import Menu
 from .midi_handler import MIDIHandler
-from .sub_command import SubCommand
-from .synth_handler import SynthHandler
-from .terminal_interface import TerminalInterface
+from .base_track import BaseTrack
 
 __all__ = [
-    Command,
+    BaseInstrument,
     BaseSequencer,
-    Menu,
     MIDIHandler,
-    SubCommand,
-    SynthHandler,
-    TerminalInterface,
+    BaseTrack,
 ]

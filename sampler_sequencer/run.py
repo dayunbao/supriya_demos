@@ -1,191 +1,126 @@
-import threading
 from sys import exit
 from typing import get_args
 
 import click
+
+from consolemenu import ConsoleMenu
+from consolemenu.items import FunctionItem, SubmenuItem, ExitItem
 
 from supriya import Server
 from supriya.clocks.bases import Quantization
 
 from .sampler import Sampler
 from .sequencer import Sequencer
-from class_lib import Command, Menu, SubCommand, TerminalInterface
 
 from .synth_defs import sample_player
 
-interface: TerminalInterface
+menu: ConsoleMenu
 sequencer: Sequencer
 server: Server
-stop_listening_for_input: threading.Event = threading.Event()
 
 def initialize_sequencer(bpm: int, quantization: str) -> None:
     global sequencer
     global server
-
-    synth_definitions = {
-        "sample_player": sample_player
-    }
     
-    sampler = Sampler(server=server, synth_definitions=synth_definitions)
+    sampler = Sampler(server=server, synth_definition=sample_player)
     sequencer = Sequencer(
         bpm=bpm, 
+        instruments=[sampler],
         quantization=quantization,
-        synth_handler=sampler
     )
 
-def consume_keyboard_input():
-    """The thread that receives user keyboard input.
-    
-    Four options are presented to the user on the command line:
-    1) `Perform` - simply handles incoming MIDI messages
-    2) `Playback` - plays a recorded sequence of MIDI messages
-    3) `Record` - records incoming MIDI messages
-    4) `Exit` - exit the program entirely.
-    
-    The whole word must be entered when choosing a mode, but case
-    doesn't matter.
-
-    If setting the sequencer to Perform mode, two options are
-    available:
-    1) `Stop` - stop playing the recorded sequence, and change to Perform mode.
-    2) `Exit` - exit the program entirely
-
-    If setting the sequencer to Record mode, three options are
-    available:
-    1) `Stop` - stop recording a sequence, and change to Perform mode.
-    2) `Clear` - delete all recorded sequences
-    3) `Exit` - exit the program entirely
-    """
-    global sequencer
-    global stop_listening_for_input
-
-    input_prompt = 'Enter a command:\n'
-
-    while not stop_listening_for_input.is_set():
-        input_options = 'Options are:\n*Perform\n*Playback\n*Record\n*Exit\n'
-
-        if sequencer.mode == Sequencer.Mode.PLAYBACK:
-            input_options = 'Options are:\n*Stop\n*Exit\n'
-
-        if sequencer.mode == Sequencer.Mode.RECORD:
-            input_options = 'Options are:\n*Stop\n*Clear\n*Exit\n'
-
-        command = input(f'{input_prompt}(Current mode is {Sequencer.Mode(sequencer.mode).name})\n{input_options}> ')
-        command = command.upper()
-        
-        if command == "STOP":
-            if sequencer.mode == Sequencer.Mode.PLAYBACK:
-                sequencer.stop_playback()
-            
-            # Set mode to PERFORM when stopping either PLAYBACK or RECORD.
-            sequencer.mode = Sequencer.Mode.PERFORM
-        
-        if command == "CLEAR":
-            # Delete all recorded notes.
-            sequencer.erase_recorded_notes()
-
-        if command == "EXIT":
-            # Quit the program.
-            exit_program()
-        
-        if command not in Sequencer.Mode.__members__:
-                print('Incorrect command.  Please try again.')
-        else:
-            if sequencer.mode == Sequencer.Mode[command]:
-                # No need to reassign.
-                continue
-            
-            if sequencer.mode == Sequencer.Mode.PLAYBACK and Sequencer.Mode[command] != Sequencer.Mode.PLAYBACK:
-                sequencer.stop_playback()
-
-            sequencer.mode = Sequencer.Mode[command]
-
-        if sequencer.mode == Sequencer.Mode.PLAYBACK:
-            sequencer.start_playback()
-
-def create_commands() -> dict[str, Command]:
-    """
-    Give Command a callback, have it change sequencer mode.
-    SubCommands' callbacks start or stop playback or recording,
-    or go BACK to main menu
-    """
-    
-    
+def create_menu() -> None:
+    global menu
     global sequencer
 
-    # SHARED
-    exit_cmd = SubCommand(
-        callback=exit,
-        command_text='exit',
+    main_menu = ConsoleMenu(
+        title='Sampler Sequencer', 
+        subtitle='Choose an option',
+        show_exit_option=False,
     )
 
-    # PERFORM
-    perform_sub_cmds = {'exit': exit_cmd}
-
-    perform_cmd = Command(
-        command_text='perform',
-        sub_commands=perform_sub_cmds,
+    ####################
+    # Shared
+    ####################
+    back_menu_item = ExitItem(text='Back to main menu')
+    
+    ####################
+    # Playback Sub-menu
+    ####################
+    playback_submenu = ConsoleMenu(title='Playback', show_exit_option=False)
+    playback_start_menu_item = FunctionItem(
+        text='Start', 
+        function=sequencer.start_playback, 
+        menu=playback_submenu,
+    )
+    playback_stop_menu_item = FunctionItem(
+        text='Stop', 
+        function=sequencer.stop_playback,
+        menu=playback_submenu
     )
 
-    # PLAYBACK
-    playback_start_sub_cmd = SubCommand(
-        callback=sequencer.set_mode_to_playback,
-        command_text='start'
+    playback_submenu.append_item(playback_start_menu_item)
+    playback_submenu.append_item(playback_stop_menu_item)
+    playback_submenu.append_item(back_menu_item)
+    # Add this to main_menu
+    playback_menu_item = SubmenuItem(text='Playback', submenu=playback_submenu, menu=main_menu)
+
+    ####################
+    # Record Sub-menu
+    ####################
+    record_submenu = ConsoleMenu(title='Record', show_exit_option=False)
+    record_start_menu_item = FunctionItem(
+        text='Start', 
+        function=sequencer.start_recording,
+        menu=playback_submenu,
+    )
+    record_stop_menu_item = FunctionItem(
+        text='Stop', 
+        function=sequencer.stop_recording,
+        menu=playback_submenu,
     )
 
-    playback_stop_sub_cmd = SubCommand(
-        callback=sequencer.set_mode_to_perform,
-        command_text='stop'
-    )
+    record_submenu.append_item(record_start_menu_item)
+    record_submenu.append_item(record_stop_menu_item)
+    record_submenu.append_item(back_menu_item)
+    # Add this to main_menu
+    record_menu_item = SubmenuItem(text='Record', submenu=record_submenu, menu=main_menu)
 
-    playback_stop_sub_cmd = SubCommand(
-        callback=sequencer.set_mode_to_perform,
-        command_text='stop'
-    )
+    ####################
+    # Sequencer Sub-menu
+    ####################
+    sequencer_submenu = ConsoleMenu(title='Sequencer settings', show_exit_option=False)
 
-    playback_sub_cmds = {
-        'stop': playback_stop_sub_cmd,
-        'exit': exit_cmd
-    }
+    sequencer_submenu.append_item(back_menu_item)
+    # Add this to main_menu
+    sequencer_menu_item = SubmenuItem(text='Sequencer', submenu=sequencer_submenu, menu=main_menu)
 
-    playback_cmd = Command(
-        callback=sequencer.set_mode_to_playback,
-        command_text='playback',
-        sub_commands=playback_sub_cmds
-    )
+    ####################
+    # Tracks Sub-menu
+    ####################
+    tracks_submenu = ConsoleMenu(title='Tracks', show_exit_option=False)
 
-    # RECORD
-    record_stop_sub_cmd = SubCommand(
-        sequencer.set_mode_to_perform,
-        command_text='stop'
-    )
+    tracks_submenu.append_item(back_menu_item)
+    # Add this to main_menu
+    tracks_menu_item = SubmenuItem(text='Tracks', submenu=tracks_submenu, menu=main_menu)
 
-    record_erase_sub_cmd = SubCommand(
-        sequencer.erase_recorded_notes,
-        command_text='erase'
-    )
+    ####################
+    # Main Menu
+    ####################
+    exit_menu_item = ExitItem(text='Exit', menu=main_menu)
+    
+    main_menu.append_item(playback_menu_item)
+    main_menu.append_item(record_menu_item)
+    main_menu.append_item(sequencer_menu_item)
+    main_menu.append_item(tracks_menu_item)
+    main_menu.append_item(exit_menu_item)
+    
+    menu = main_menu
 
-    record_sub_cmds = {
-        'stop': record_stop_sub_cmd,
-        'erase': record_erase_sub_cmd,
-        'exit': exit_cmd
-
-    }
-
-    record_cmd = Command(
-        command_text='playback',
-        sub_commands=record_sub_cmds
-    )
-
-    # ALL
-    commands = {
-        'perform': perform_cmd,
-        'playback': playback_cmd,
-        'record': record_cmd,
-        'exit': exit_cmd,
-    }
-
-    return commands
+def start_menu() -> None:
+    global menu
+    
+    menu.show()
 
 def exit_program() -> None:
     """Exit the program."""
@@ -194,32 +129,15 @@ def exit_program() -> None:
 
     print('Exiting Sampler Sequencer')
     sequencer.exit()
-    stop_listening_for_input.set()
     server.quit()
     # Calling this makes sure the SuperCollider server shuts down
     # and doesn't linger after the program exits.
     exit(0)
-
-def initialize_interface() -> None:
-    global interface
-
-    menu = Menu(commands=create_commands())
-
-    interface = TerminalInterface(
-        menu=menu,
-        prompt='Enter a command:',
-    )
     
 def initialize_server() -> None:
     global server
 
     server = Server().boot()
-
-def listen_for_keyboard_input():
-    """Starts the thread that listens for keyboard input."""
-    consumer_thread = threading.Thread(target=consume_keyboard_input, daemon=True)
-    consumer_thread.start()
-    consumer_thread.join()
 
 @click.command()
 @click.option('-b', '--bpm', default=120, type=int, help='Beats per minute.')
@@ -230,14 +148,9 @@ def start(bpm: int, quantization: str) -> None:
 
     initialize_server()
     initialize_sequencer(bpm=bpm, quantization=quantization)
-    # listen_for_keyboard_input()
-    initialize_interface()
-    start_interface()
-
-def start_interface() -> None:
-    global interface
-
-    interface.listen_for_input()
+    create_menu()
+    start_menu()
+    exit_program()
 
 def verify_bpm(bpm: int) -> None:
     """Make sure the BPM is in a reasonable range.

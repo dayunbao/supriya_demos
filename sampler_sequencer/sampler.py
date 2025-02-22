@@ -4,18 +4,30 @@ from mido import Message
 
 from supriya import Buffer, Server, SynthDef
 
-from class_lib import SynthHandler
+from class_lib import BaseInstrument
 
-class Sampler(SynthHandler):
-    def __init__(self, server: Server, synth_definitions: dict[str, SynthDef]):
-        super().__init__(server, synth_definitions)
-        self.drum_samples_path: Path = Path(__file__).parent / 'samples/roland_tr_909'
-        self.drum_buffers = self._load_buffers()
+class Sampler(BaseInstrument):
+    def __init__(self, server: Server, synth_definition: SynthDef):
+        super().__init__(server, synth_definition)
+        self._drum_samples_path: Path = Path(__file__).parent / 'samples/roland_tr_909'
+        self._drum_buffers = self._load_buffers()
         self._load_synthdefs()
+        self._name = 'Sampler'
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def name(self) -> str:
+        return self._name
+    
+    @name.setter
+    def name(self, name: str) -> str:
+        self._name = name
 
     def _load_buffers(self) -> list[Buffer]:
         drum_buffers = []
-        for sample_path in sorted(self.drum_samples_path.rglob(pattern='*.wav')):
+        for sample_path in sorted(self._drum_samples_path.rglob(pattern='*.wav')):
             drum_buffers.append(self.server.add_buffer(file_path=str(sample_path)))
         
         return drum_buffers
@@ -53,10 +65,10 @@ class Sampler(SynthHandler):
             message: a Note On Message
         """
         if message.channel < 12:
-            drum_buff = self.drum_buffers[message.channel]
+            drum_buff = self._drum_buffers[message.channel]
             _ = self.server.add_synth(
-                synthdef=self.synth_definitions['sample_player'], 
-                drum_buff=drum_buff
+                synthdef=self.synth_definition, 
+                drum_buff=drum_buff,
             )
         else:
             pass

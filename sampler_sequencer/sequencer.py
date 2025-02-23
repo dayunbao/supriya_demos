@@ -44,6 +44,14 @@ class Sequencer(BaseSequencer):
         self._clock.change(beats_per_minute=self._bpm)
 
     @property
+    def instruments(self) -> list[BaseInstrument]:
+        return self._instruments
+    
+    @instruments.setter
+    def instruments(self, instruments: list[BaseInstrument]) -> None:
+        self._instruments = instruments
+
+    @property
     def quantization(self) -> str:
         return self._quantization
     
@@ -77,13 +85,18 @@ class Sequencer(BaseSequencer):
     def tracks(self, tracks: list[Track]) -> None:
         self._tracks = tracks
 
-    def add_track(self, instruments_index) -> None:
+    def add_track(self, instrument_name: str) -> None:
+        instrument_index = 0
+        for index, instrument in enumerate(self.instruments):
+            if instrument_name ==  instrument.name:
+                instrument_index = index
+        
         track = Track(
-            clock=self.clock,
+            clock=self._clock,
             is_recording=self.is_recording,
             quantization=self.quantization,
             sequencer_steps=self.SEQUENCER_STEPS,
-            instrument=self._instruments[instruments_index],
+            instrument=self._instruments[instrument_index],
             track_number=self.tracks[-1].track_number + 1,
         )
 

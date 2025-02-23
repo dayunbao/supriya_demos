@@ -23,10 +23,18 @@ class BaseTrack(ABC):
         self._instrument = instrument
     
     def __str__(self) -> str:
-        return f'Track: {self.track_number}, \
-        Quantization: {self.quantization}, \
-        Instrument: {self.instrument}'
+        return f'Track: {self._track_number}, \
+        Quantization: {self._quantization}, \
+        Instrument: {self._instrument}'
     
+    @property
+    def track_number(self) -> int:
+        return self._track_number
+    
+    @track_number.setter
+    def track_number(self, track_number: int) -> None:
+        self._track_number = track_number
+
     @property
     def quantization(self) -> str:
         return self._quantization
@@ -45,7 +53,6 @@ class BaseTrack(ABC):
     def _convert_quantization_to_delta(self, quantization: str) -> float:
         # This helper function converts a string like '1/16' into a numeric value
         # used by the clock.
-        print(f'quantization={quantization}')
         return self._clock.quantization_to_beats(quantization=quantization)
 
     @abstractmethod

@@ -28,7 +28,7 @@ class Sampler(BaseInstrument):
     def _load_buffers(self) -> list[Buffer]:
         drum_buffers = []
         for sample_path in sorted(self._drum_samples_path.rglob(pattern='*.wav')):
-            drum_buffers.append(self.server.add_buffer(file_path=str(sample_path)))
+            drum_buffers.append(self._server.add_buffer(file_path=str(sample_path)))
         
         return drum_buffers
 
@@ -66,7 +66,7 @@ class Sampler(BaseInstrument):
         """
         if message.channel < 12:
             drum_buff = self._drum_buffers[message.channel]
-            _ = self.server.add_synth(
+            _ = self._server.add_synth(
                 synthdef=self.synth_definition, 
                 drum_buff=drum_buff,
             )

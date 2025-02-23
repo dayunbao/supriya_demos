@@ -18,21 +18,31 @@ from mido import Message
 
 from class_lib import MIDIHandler
 from class_lib import BaseSequencer
-from class_lib import SynthHandler
+from class_lib import BaseInstrument
 from .track import Track
 
 class Sequencer(BaseSequencer):    
     def __init__(
             self, 
             bpm: int, 
-            instruments: list[SynthHandler],
+            instruments: list[BaseInstrument],
             quantization: str,
     ):
         super().__init__(bpm, quantization)
-        self.instruments = instruments
+        self._instruments = instruments
         self._midi_handler = self._initialize_midi_handler()
-        self.is_recording = False
+        self._is_recording = False
         self._tracks: list[Track] = self._initialize_tracks()
+
+    @property
+    def is_recording(self) -> bool:
+        return self._is_recording
+    
+    @is_recording.setter
+    def is_recording(self, is_recording: bool) -> None:
+        self._is_recording = is_recording
+        for t in self.tracks:
+            t.is_recording = self._is_recording
 
     @property
     def midi_handler(self) -> MIDIHandler:
@@ -50,12 +60,13 @@ class Sequencer(BaseSequencer):
     def tracks(self, tracks: list[Track]) -> None:
         self._tracks = tracks
 
-    def add_track(self) -> None:
+    def add_track(self, instruments_index) -> None:
         track = Track(
             clock=self.clock,
+            is_recording=self.is_recording,
             quantization=self.quantization,
-            sequencer_mode=self.mode,
-            synth_handler=self.synth_handler,
+            sequencer_steps=self.SEQUENCER_STEPS,
+            instrument=self._instruments[instruments_index],
             track_number=self.tracks[-1].track_number + 1,
         )
 
@@ -75,28 +86,21 @@ class Sequencer(BaseSequencer):
     def _initialize_tracks(self) -> list[Track]:
         track = Track(
             clock=self.clock,
+            is_recording=self.is_recording,
             quantization=self.quantization,
-            sequencer_mode=self.mode,
-            synth_handler=self.synth_handler,
+            sequencer_steps=self.SEQUENCER_STEPS,
+            # Default to the first available
+            instrument=self._instruments[0],
             track_number=0,
         )
         
         return [track]
 
     def handle_midi_message(self, message: Message) -> None:
-        # The SynthHandler is responsible for playing notes
+        # The tracks' instrument are responsible for playing notes
         # We play a note whether or note we're recording. 
-        self.synth_handler.handle_midi_message(message=message)
-        
-        # The Sequencer is responsible for recording the notes
-        if self.mode == Sequencer.Mode.RECORD and self.is_recording:
-            # recorded_time is in a factor of quantization_delta, and is based
-            # on the scaled value of the message's note.
-            # This makes playback very simple because for each invocation of 
-            # the clock's callback, we can simply check for messages at the delta.
-            recorded_time = (message.note % self.SEQUENCER_STEPS) * self.quantization_delta
-            recorded_message = message.copy(time=recorded_time)
-            self.recorded_notes[recorded_time].append(recorded_message)
+        for track in self.tracks:
+            track.handle_midi_message(message=message)
     
     def start_playback(self) -> None:
         """Start playing back all of the tracks."""

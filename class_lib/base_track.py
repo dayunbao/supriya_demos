@@ -18,7 +18,7 @@ class BaseTrack(ABC):
         self.clock = clock
         self.clock_event_id: int | None = None
         self.quantization = quantization
-        self.quantization_delta = self.quantization_delta = self._convert_quantization_to_delta(quantization=quantization)
+        self.quantization_delta = self._convert_quantization_to_delta(quantization=quantization)
         self.sequencer_steps =  sequencer_steps
         self.instrument = instrument
     
@@ -36,6 +36,7 @@ class BaseTrack(ABC):
     def _convert_quantization_to_delta(self, quantization: str) -> float:
         # This helper function converts a string like '1/16' into a numeric value
         # used by the clock.
+        print(f'quantization={quantization}')
         return self.clock.quantization_to_beats(quantization=quantization)
 
     @abstractmethod

@@ -17,7 +17,13 @@ class Track(BaseTrack):
             instrument: BaseInstrument,
             track_number: int,
         ):
-        super().__init__(clock, quantization, sequencer_steps, instrument, track_number)
+        super().__init__(
+            clock, 
+            instrument, 
+            quantization, 
+            sequencer_steps, 
+            track_number,
+        )
         self.is_recording = is_recording
         self._recorded_notes: dict[float, list[Message]] = defaultdict(list)
 

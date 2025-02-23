@@ -22,6 +22,8 @@ def initialize_sequencer(bpm: int, quantization: str) -> None:
     global sequencer
     global server
     
+    print(f'quantization={quantization}')
+
     sampler = Sampler(server=server, synth_definition=sample_player)
     sequencer = Sequencer(
         bpm=bpm, 

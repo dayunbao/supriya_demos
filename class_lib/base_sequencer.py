@@ -26,9 +26,9 @@ class BaseSequencer(ABC):
             bpm: int, 
             quantization: str,
     ):
-        self.bpm: int = bpm
-        self.clock = self._initialize_clock()
-        self.quantization = quantization
+        self._bpm: int = bpm
+        self._clock = self._initialize_clock()
+        self._quantization = quantization
         self.SEQUENCER_STEPS: int = 16
 
     @property
@@ -42,7 +42,7 @@ class BaseSequencer(ABC):
     def _initialize_clock(self) -> Clock:
         """Initialize the Supriya's Clock."""
         clock = Clock()
-        clock.change(beats_per_minute=self.bpm)
+        clock.change(beats_per_minute=self._bpm)
         clock.start()
 
         return clock

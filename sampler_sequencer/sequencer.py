@@ -35,6 +35,23 @@ class Sequencer(BaseSequencer):
         self._tracks: list[Track] = self._initialize_tracks()
 
     @property
+    def bpm(self) -> int:
+        return self._bpm
+    
+    @bpm.setter
+    def bpm(self, bpm: int) -> None:
+        self._bpm = bpm
+        self._clock.change(beats_per_minute=self._bpm)
+
+    @property
+    def quantization(self) -> str:
+        return self._quantization
+    
+    @quantization.setter
+    def quantization(self, quantization: str) -> None:
+        self._quantization = quantization
+
+    @property
     def is_recording(self) -> bool:
         return self._is_recording
     
@@ -85,9 +102,9 @@ class Sequencer(BaseSequencer):
 
     def _initialize_tracks(self) -> list[Track]:
         track = Track(
-            clock=self.clock,
+            clock=self._clock,
             is_recording=self.is_recording,
-            quantization=self.quantization,
+            quantization=self._quantization,
             sequencer_steps=self.SEQUENCER_STEPS,
             # Default to the first available
             instrument=self._instruments[0],

@@ -7,15 +7,21 @@ from supriya import Buffer, Server, SynthDef
 from class_lib import BaseInstrument
 
 class Sampler(BaseInstrument):
-    def __init__(self, server: Server, synth_definition: SynthDef):
-        super().__init__(server, synth_definition)
+    def __init__(
+            self, 
+            server: Server, 
+            synth_definition: SynthDef,
+            midi_channels: list[int],
+        ):
+        super().__init__(server, synth_definition, midi_channels)
         self._drum_samples_path: Path = Path(__file__).parent / 'samples/roland_tr_909'
         self._drum_buffers = self._load_buffers()
         self._load_synthdefs()
         self._name = 'Sampler'
 
     def __str__(self):
-        return self.name
+        channels = ', '.join([str(c) for c in self._midi_channels])
+        return f'Name: {self.name}, MIDI Channels: {channels}'
 
     @property
     def name(self) -> str:
@@ -64,11 +70,9 @@ class Sampler(BaseInstrument):
         Args:
             message: a Note On Message
         """
-        if message.channel < 12:
+        if message.channel in self._midi_channels:
             drum_buff = self._drum_buffers[message.channel]
             _ = self._server.add_synth(
-                synthdef=self.synth_definition, 
+                synthdef=self._synth_definition, 
                 drum_buff=drum_buff,
             )
-        else:
-            pass

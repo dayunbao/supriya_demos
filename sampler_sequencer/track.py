@@ -24,7 +24,7 @@ class Track(BaseTrack):
             sequencer_steps, 
             track_number,
         )
-        self.is_recording = is_recording
+        self._is_recording = is_recording
         self._recorded_notes: dict[float, list[Message]] = defaultdict(list)
 
     @property
@@ -36,13 +36,13 @@ class Track(BaseTrack):
         self._recorded_notes = notes
 
     def erase_recorded_notes(self) -> None:
-        self.recorded_notes = defaultdict(list)
+        self._recorded_notes = defaultdict(list)
     
     def handle_midi_message(self, message: Message) -> None:
         """Decide how to handle incoming MIDI notes based on the mode."""
         # The SynthHandler is responsible for playing notes
         # We play a note whether or note we're recording. 
-        self.instrument.handle_midi_message(message=message)
+        self._instrument.handle_midi_message(message=message)
         
         # The Sequencer is responsible for recording the notes
         if self.is_recording:
@@ -52,7 +52,7 @@ class Track(BaseTrack):
             # the clock's callback, we can simply check for messages at the delta.
             recorded_time = (message.note % self.sequencer_steps) * self.quantization_delta
             recorded_message = message.copy(time=recorded_time)
-            self.recorded_notes[recorded_time].append(recorded_message)
+            self._recorded_notes[recorded_time].append(recorded_message)
 
 
     def track_clock_callback(
@@ -71,12 +71,12 @@ class Track(BaseTrack):
         """
         recorded_notes_index = delta * (context.event.invocations % self.sequencer_steps )
 
-        midi_messages = self.recorded_notes[recorded_notes_index]
+        midi_messages = self._recorded_notes[recorded_notes_index]
         for message in midi_messages:
-            self.instrument.handle_midi_message(message=message)
+            self._instrument.handle_midi_message(message=message)
         
-        delta = self.quantization_delta
+        delta = self._quantization_delta
         return delta, time_unit
     
     def start_playback(self) -> None:
-        self.clock_event_id = self.clock.cue(procedure=self.track_clock_callback, quantization='1/4')
+        self._clock_event_id = self._clock.cue(procedure=self.track_clock_callback, quantization='1/4')

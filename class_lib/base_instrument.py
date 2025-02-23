@@ -23,26 +23,24 @@ from supriya import Server, SynthDef
 
 
 class BaseInstrument(ABC):
-    def __init__(self, server: Server, synth_definition: SynthDef ):
+    def __init__(
+        self, 
+        server: Server, 
+        synth_definition: SynthDef,
+        midi_channels: list[int],
+    ):
         self._server = server
         self._synth_definition = synth_definition
+        self._midi_channels = midi_channels
         self._synths = {}
     
     @property
     @abstractmethod
     def name(self):
         pass
-
-    @property
-    def synth_definition(self) -> SynthDef:
-        return self._synth_definition
-    
-    @synth_definition.setter
-    def synth_definition(self, synth_def: SynthDef) -> None:
-        self._synth_definition = synth_def
     
     def _load_synthdefs(self) -> None:
-        _ = self._server.add_synthdefs(self.synth_definition)
+        _ = self._server.add_synthdefs(self._synth_definition)
         # Wait for the server to fully load the SynthDef before proceeding.
         self._server.sync()
     

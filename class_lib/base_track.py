@@ -14,19 +14,28 @@ class BaseTrack(ABC):
         sequencer_steps: int,
         track_number: int,
     ):
-        self.track_number = track_number
-        self.clock = clock
-        self.clock_event_id: int | None = None
-        self.quantization = quantization
-        self.quantization_delta = self._convert_quantization_to_delta(quantization=quantization)
-        self.sequencer_steps =  sequencer_steps
-        self.instrument = instrument
+        self._track_number = track_number
+        self._clock = clock
+        self._clock_event_id: int | None = None
+        self._quantization = quantization
+        self._quantization_delta = self._convert_quantization_to_delta(quantization=quantization)
+        self._sequencer_steps =  sequencer_steps
+        self._instrument = instrument
     
     def __str__(self) -> str:
         return f'Track: {self.track_number}, \
         Quantization: {self.quantization}, \
         Instrument: {self.instrument}'
     
+    @property
+    def quantization(self) -> str:
+        return self._quantization
+    
+    @quantization.setter
+    def quantization(self, quantization: str) -> None:
+        self._quantization = quantization
+        self.quantization_delta = self._convert_quantization_to_delta(quantization=quantization)
+
     @property
     @abstractmethod
     def recorded_notes(self):
@@ -37,7 +46,7 @@ class BaseTrack(ABC):
         # This helper function converts a string like '1/16' into a numeric value
         # used by the clock.
         print(f'quantization={quantization}')
-        return self.clock.quantization_to_beats(quantization=quantization)
+        return self._clock.quantization_to_beats(quantization=quantization)
 
     @abstractmethod
     def erase_recorded_notes(self) -> None:
@@ -59,5 +68,5 @@ class BaseTrack(ABC):
 
     def stop_playback(self) -> None:
         """Stop playing track."""
-        if self.clock_event_id is not None:
-            self.clock.cancel(self.clock_event_id)
+        if self._clock_event_id is not None:
+            self._clock.cancel(self._clock_event_id)

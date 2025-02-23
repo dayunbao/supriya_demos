@@ -3,8 +3,10 @@ from typing import get_args
 
 import click
 
-from consolemenu import ConsoleMenu
+from consolemenu import ConsoleMenu, MenuFormatBuilder
 from consolemenu.items import FunctionItem, SubmenuItem, ExitItem
+from consolemenu.prompt_utils import PromptUtils, UserQuit
+from consolemenu.validators.base import BaseValidator
 
 from supriya import Server
 from supriya.clocks.bases import Quantization
@@ -14,6 +16,28 @@ from .sequencer import Sequencer
 
 from .synth_defs import sample_player
 
+
+class BPMValidator(BaseValidator):
+    def validate(self, input_string):
+        result = True
+        if int(input_string) < 60 or int(input_string) > 220:
+            result = False
+
+        return result
+
+class QuantizationValidator(BaseValidator):
+    def validate(self, input_string):
+        """Make sure the quantization is one that matches what's available.
+
+        Args:
+            quantization: a string in the form 1/4, 1/8T, etc.
+        """
+        result = True
+        if input_string not in get_args(Quantization):
+            result = False
+
+        return result
+
 menu: ConsoleMenu
 sequencer: Sequencer
 server: Server
@@ -21,10 +45,12 @@ server: Server
 def initialize_sequencer(bpm: int, quantization: str) -> None:
     global sequencer
     global server
-    
-    print(f'quantization={quantization}')
 
-    sampler = Sampler(server=server, synth_definition=sample_player)
+    sampler = Sampler(
+        midi_channels=[x for x in range(16)],
+        server=server, 
+        synth_definition=sample_player
+    )
     sequencer = Sequencer(
         bpm=bpm, 
         instruments=[sampler],
@@ -39,6 +65,7 @@ def create_menu() -> None:
         title='Sampler Sequencer', 
         subtitle='Choose an option',
         show_exit_option=False,
+        clear_screen=False
     )
 
     ####################
@@ -91,8 +118,29 @@ def create_menu() -> None:
     ####################
     # Sequencer Sub-menu
     ####################
-    sequencer_submenu = ConsoleMenu(title='Sequencer settings', show_exit_option=False)
+    sequencer_submenu = ConsoleMenu(
+        title='Sequencer Settings', 
+        prologue_text=get_current_sequencer_settings,
+        show_exit_option=False,
+        clear_screen=True,
+        formatter=MenuFormatBuilder()
+        .set_title_align('center')
+        .set_subtitle_align('center')
+        .set_prologue_text_align('center')
+        # .show_prologue_top_border(True)
+        .show_prologue_bottom_border(True),
+    )
+    sequencer_change_bpm_menu_item = FunctionItem(
+        text='Change BPM',
+        function=get_bpm_input,
+    )
+    sequencer_change_quantization_menu_item = FunctionItem(
+        text='Change quantization',
+        function=get_quantization_input,
+    )
 
+    sequencer_submenu.append_item(sequencer_change_bpm_menu_item)
+    sequencer_submenu.append_item(sequencer_change_quantization_menu_item)
     sequencer_submenu.append_item(back_menu_item)
     # Add this to main_menu
     sequencer_menu_item = SubmenuItem(text='Sequencer', submenu=sequencer_submenu, menu=main_menu)
@@ -119,6 +167,58 @@ def create_menu() -> None:
     
     menu = main_menu
 
+def get_current_sequencer_settings() -> str:
+    global sequencer
+    
+    return f'Current settings:\nBeats per minute(BPM) = {sequencer.bpm} * Quantization = {sequencer.quantization}'
+
+def get_bpm_input() -> None:
+    global BPMValidator
+    global menu
+    global sequencer
+    
+    prompt_util = PromptUtils(screen=menu.screen)
+    bpm_validator = BPMValidator()
+    
+    try:
+        bpm, is_valid = prompt_util.input(
+            prompt='Enter a BPM in the range 60-200',
+            enable_quit=True,
+            validators=[bpm_validator],
+        )
+
+        if is_valid:
+            sequencer.bpm = int(bpm)
+        else:    
+            prompt_util.println(f'Invalid BPM provided: {bpm}')
+            return
+
+    except UserQuit:
+        return
+
+def get_quantization_input() -> None:
+    global QuantizationValidator
+    global menu
+
+    prompt_util = PromptUtils(screen=menu.screen)
+    quantization_validator = QuantizationValidator()
+    valid_quantizations = ', '.join([q for q in get_args(Quantization)])
+    
+    try:
+        quantization, is_valid = prompt_util.input(
+            prompt=f'Enter one of {valid_quantizations}',
+            enable_quit=True,
+            validators=[quantization_validator],
+        )
+
+        if is_valid:
+            sequencer.quantization = quantization
+        else:
+            prompt_util.println(f'Invalid quantization provided: {quantization}')
+            return
+    except UserQuit:
+        return
+
 def start_menu() -> None:
     global menu
     
@@ -135,7 +235,7 @@ def exit_program() -> None:
     # Calling this makes sure the SuperCollider server shuts down
     # and doesn't linger after the program exits.
     exit(0)
-    
+
 def initialize_server() -> None:
     global server
 
@@ -145,23 +245,14 @@ def initialize_server() -> None:
 @click.option('-b', '--bpm', default=120, type=int, help='Beats per minute.')
 @click.option('-q', '--quantization', default='1/16', type=str, help='The rhythmic value for sequenced notes.')
 def start(bpm: int, quantization: str) -> None:
-    verify_bpm(bpm=bpm)
-    verify_quantization(quantization=quantization)
+    # verify_bpm(bpm=bpm)
+    # verify_quantization(quantization=quantization)
 
     initialize_server()
     initialize_sequencer(bpm=bpm, quantization=quantization)
     create_menu()
     start_menu()
     exit_program()
-
-def verify_bpm(bpm: int) -> None:
-    """Make sure the BPM is in a reasonable range.
-
-    Args:
-        bpm: the beats per minute.
-    """
-    if bpm < 60 or bpm > 220:
-        exit(f'Invalid bpm {bpm}.\nPlease enter a BPM in the range 60-220.')
 
 def verify_quantization(quantization: str) -> None:
     """Make sure the quantization is one that matches what's available.

@@ -72,6 +72,27 @@ class Sequencer(BaseSequencer):
         self._midi_handler = midi_handler
 
     @property
+    def quantization(self) -> str:
+        return self._quantization
+    
+    @quantization.setter
+    def quantization(self, quantization: str) -> None:
+        self._quantization = quantization
+        self.quantization_delta = self._convert_quantization_to_delta(quantization=self._quantization)
+        self._track_length_in_measures = self._compute_track_length_in_measures()
+
+    @property
+    def quantization_delta(self) -> float:
+        return self._quantization_delta
+
+    @quantization_delta.setter
+    def quantization_delta(self, quantization_delta: float) -> None:
+        self._quantization_delta = quantization_delta
+        for tracks in self.tracks.values():
+            for track in tracks:
+                track.quantization_delta = self._quantization_delta
+
+    @property
     def tracks(self) -> dict[str, list[Track]]:
         return self._tracks
     
@@ -169,43 +190,37 @@ class Sequencer(BaseSequencer):
     def sequencer_clock_callback(
         self, 
         context=ClockContext, 
-        delta=0.0625, 
+        delta=1.0, # 1 measure 
         time_unit=TimeUnit.BEATS,
     ) -> tuple[float, TimeUnit]:
-        if context.event.invocations == 0:
-            self.start_tracks_playback(measure=1)
-
-        if self._is_new_measure(current_measure=context.desired_moment.measure) and context.desired_moment.measure % self._track_length_in_measures == 0:
+        # print(f'context.event.invocations={context.event.invocations}')
+        # print(f'context.desired_moment.measure={context.desired_moment.measure}')
+        if context.event.invocations % self._track_length_in_measures == 0:
             self.stop_tracks_playback()
-            self.start_tracks_playback(measure=context.desired_moment.measure)
+            self.start_tracks_playback(measure=context.event.invocations)
 
-        delta = self.quantization_delta
         return delta, time_unit
-
-    def _is_new_measure(self, current_measure) -> bool:
-        if current_measure == self.previous_measure:
-            return False
-        else:
-            self.previous_measure = current_measure
-            return True
 
     def start_playback(self) -> None:
         self._clock.start()
         self._clock_event_id = self._clock.cue(procedure=self.sequencer_clock_callback)
 
-    def start_tracks_playback(self, measure: int, quantization: Optional[str | None]=None) -> None:
-        if self.playing_tracks:
-            self.playing_tracks.clear()
+    def start_tracks_playback(self, measure: int) -> None:
+        # print(f'In start_tracks_playback on measure = {measure}')
+        # if self.playing_tracks:
+        #     self.playing_tracks.clear()
         
         for tracks in self.tracks.values():
-            if (measure - 1) < len(tracks):
-                self.playing_tracks.append(tracks[measure - 1])
+            # if measure < len(tracks):
+            self.playing_tracks.append(tracks[measure])
         
         if not self.playing_tracks:
             self.stop_tracks_playback()
 
+        print(f'{[print(t.recorded_notes) for t in self.playing_tracks]}')
+
         for track in self.playing_tracks:
-            track.start_playback(quantization=quantization)
+            track.start_playback()
 
     def stop_tracks_playback(self) -> None:
         for track in self.playing_tracks:

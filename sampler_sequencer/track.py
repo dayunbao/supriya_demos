@@ -55,6 +55,7 @@ class Track(BaseTrack):
             # the clock's callback, we can simply check for messages at the delta.
             recorded_time = (message.note % self._sequencer_steps) * self.quantization_delta
             recorded_message = message.copy(time=recorded_time)
+            # print(f'recorded_message = {recorded_message}')
             self.recorded_notes[recorded_time].append(recorded_message)
 
 
@@ -72,14 +73,16 @@ class Track(BaseTrack):
         you can specify SECONDS as the time_unit to have it called outside of a 
         musical rhythmic context.
         """
+        print(f'context.desired_moment.measure={context.desired_moment.measure}')
         recorded_notes_index = delta * (context.event.invocations % self._sequencer_steps )
 
         midi_messages = self.recorded_notes[recorded_notes_index]
         for message in midi_messages:
+            # print(f'Playing message {message}')
             self._instrument.handle_midi_message(message=message)
         
         delta = self.quantization_delta
         return delta, time_unit
     
-    def start_playback(self, quantization: Optional[str | None]=None) -> None:
-        self._clock_event_id = self._clock.cue(procedure=self.track_clock_callback, quantization=quantization)
+    def start_playback(self) -> None:
+        self._clock_event_id = self._clock.cue(procedure=self.track_clock_callback)

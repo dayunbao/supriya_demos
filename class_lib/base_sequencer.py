@@ -48,23 +48,6 @@ class BaseSequencer(ABC):
     def bpm(self, bpm: int) -> None:
         self._bpm = bpm
         self._clock.change(beats_per_minute=self._bpm)
-
-    @property
-    def quantization(self) -> str:
-        return self._quantization
-    
-    @quantization.setter
-    def quantization(self, quantization: str) -> None:
-        self._quantization = quantization
-        self.quantization_delta = self._convert_quantization_to_delta(quantization=quantization)
-    
-    @property
-    def quantization_delta(self) -> float:
-        return self._quantization_delta
-    
-    @quantization_delta.setter
-    def quantization_delta(self, quantization_delta: float) -> None:
-        self._quantization_delta = quantization_delta
     
     def _compute_track_length_in_measures(self) -> int:
         return self._SEQUENCER_STEPS / int(self.quantization.split('/')[1])

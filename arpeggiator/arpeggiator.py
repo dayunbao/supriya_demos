@@ -26,16 +26,10 @@ from supriya.conversions import midi_note_number_to_frequency
 from supriya.patterns import EventPattern, PatternPlayer, SequencePattern
 from supriya.ugens import EnvGen, Limiter, LFSaw, Out
 
-server: Server
-arpeggiator_sequence: SequencePattern
-arpeggiator_pattern: EventPattern
-arpeggiator: PatternPlayer
-
 
 ########################################
 ####### General Python functions #######
 ########################################
-
 
 def get_note_offset(root: str, accidental: Union[str, None]) -> int:
     """Get a offset from 0 (C natural).
@@ -80,7 +74,6 @@ def get_note_offset(root: str, accidental: Union[str, None]) -> int:
 
     return note_index
 
-
 def get_scale_degrees_indices(direction: str) -> list[int]:
     """Get a list of indices based on direction.
 
@@ -97,7 +90,6 @@ def get_scale_degrees_indices(direction: str) -> list[int]:
         return [6, 4, 2, 0]
     else:
         return [0, 2, 4, 6, 4, 2]
-
 
 def parse_chord(chord: str) -> list:
     """Split the chord user input into relevant parts
@@ -117,7 +109,6 @@ def parse_chord(chord: str) -> list:
 
     return split_chord
 
-
 def verify_arp_direction(direction: str) -> None:
     """Verify the direction input.
 
@@ -130,7 +121,6 @@ def verify_arp_direction(direction: str) -> None:
         print("Incorrect direction provided.")
         print("Please provide one of 'up', 'down', or 'up-and-down'.")
         sys.exit(1)
-
 
 def verify_chord(chord: str) -> None:
     """Verify the chord input.
@@ -147,7 +137,6 @@ def verify_chord(chord: str) -> None:
         print("A-G, optional # or b, M or m, 0-8.  Example: BbM5")
         sys.exit(1)
 
-
 @click.command()
 @click.option("-c", "--chord", default="CM4", type=str)
 @click.option("-d", "--direction", default="up", type=str)
@@ -156,11 +145,10 @@ def start(chord: str, direction: str) -> None:
     verify_arp_direction(direction=arp_direction)
     verify_chord(chord=chord)
     chord_data = parse_chord(chord=chord)
-    create_sequence(chord_data=chord_data, direction=arp_direction)
-
-    create_arpeggiator()
-    initialize()
-    play_arpeggiator()
+    arpeggiator_sequence = create_sequence(chord_data=chord_data, direction=arp_direction)
+    arpeggiator_pattern = create_arpeggiator(arpeggiator_sequence=arpeggiator_sequence)
+    server = initialize()
+    play_arpeggiator(arpeggiator_pattern=arpeggiator_pattern, server=server)
 
     while True:
         continue
@@ -170,8 +158,7 @@ def start(chord: str, direction: str) -> None:
 ###### Supriya specific functions ######
 ########################################
 
-
-def create_sequence(chord_data: list, direction: str) -> None:
+def create_sequence(chord_data: list, direction: str) -> SequencePattern:
     """Create the SequencePattern.
 
     Args:
@@ -182,8 +169,6 @@ def create_sequence(chord_data: list, direction: str) -> None:
         direction: a string indicating whether notes are played
         in ascending order, descending order, or both.
     """
-    global arpeggiator_sequence
-
     # A dictionary containing scale degrees for major and minor keys.
     # The list of ints represents how many half steps are required
     # to reach the note in the scale, where 0 represents the
@@ -217,14 +202,18 @@ def create_sequence(chord_data: list, direction: str) -> None:
     # So we need to convert them.
     frequencies = [midi_note_number_to_frequency(x) for x in midi_notes]
     # Finally create the SequencePlayer
-    arpeggiator_sequence = SequencePattern(frequencies, iterations=None)
+    return SequencePattern(frequencies, iterations=None)
 
-
-def create_arpeggiator() -> None:
-    """Create an EventPattern."""
-    global arpeggiator_sequence
-    global arpeggiator_pattern
-
+def create_arpeggiator(arpeggiator_sequence: SequencePattern) -> EventPattern:
+    """Create an EventPattern.
+    
+    Args:
+        arpeggiator_sequence: the sequence of notes to play.
+    
+    Returns:
+        arpeggiator_pattern: the SequencePattern object that will
+        be used to startplaying the arpeggio.
+    """
     arpeggiator_pattern = EventPattern(
         frequency=arpeggiator_sequence,
         synthdef=saw,
@@ -232,24 +221,20 @@ def create_arpeggiator() -> None:
         duration=0.0625,
     )
 
+    return arpeggiator_pattern
 
-def initialize() -> None:
+def initialize() -> Server:
     """Boot the server, and load the SynthDef."""
-    global server
     server = Server().boot()
     _ = server.add_synthdefs(saw)
     # Wait for the server to fully load the SynthDef before proceeding.
     server.sync()
 
+    return server
 
-def play_arpeggiator() -> None:
+def play_arpeggiator(arpeggiator_pattern: EventPattern, server: Server) -> PatternPlayer:
     """Create a PatternPlayer, and play it."""
-    global arpeggiator_pattern
-    global arpeggiator
-    global server
-
-    arpeggiator = arpeggiator_pattern.play(context=server)
-
+    return arpeggiator_pattern.play(context=server)
 
 @synthdef()
 def saw(frequency=440.0, amplitude=0.5, gate=1) -> None:
@@ -279,19 +264,19 @@ def saw(frequency=440.0, amplitude=0.5, gate=1) -> None:
 
     Out.ar(bus=0, source=signal)
 
-
-def stop_arpeggiator() -> None:
+def stop_arpeggiator(arpeggiator: PatternPlayer) -> None:
     """Stop the PatternPlayer.
 
     This isn't being called, since I'm just killing the program
     with Ctrl-C. However, if you want to handle exiting the
     program more gracefully, you could use this function as
     part of that.
+    
+    Args:
+        arpeggiator: a PatternPlayer object that can be used
+        to stop playing the arpeggio.
     """
-    global arpeggiator
-
     arpeggiator.stop()
-
 
 if __name__ == "__main__":
     start()

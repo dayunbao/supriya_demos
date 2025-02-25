@@ -13,7 +13,7 @@ from .sampler import Sampler
 from .sequencer import Sequencer
 from .sp_303 import SP303
 
-from .synth_defs import sample_player, sp_303
+from .synth_defs import sample_player #  , sp_303
 
 
 class BPMValidator(BaseValidator):
@@ -75,15 +75,15 @@ def initialize_sequencer(bpm: int, quantization: str) -> None:
         synth_definition=sample_player
     )
 
-    supriya_303 = SP303(
-        midi_channels=[x for x in range(16)],
-        server=server, 
-        synth_definition=sp_303
-    )
+    # supriya_303 = SP303(
+    #     midi_channels=[x for x in range(16)],
+    #     server=server, 
+    #     synth_definition=sp_303
+    # )
 
     sequencer = Sequencer(
         bpm=bpm, 
-        instruments={sampler.name: sampler, supriya_303.name: supriya_303},
+        instruments={sampler.name: sampler}, #  , supriya_303.name: supriya_303},
         quantization=quantization,
     )
 
@@ -118,7 +118,8 @@ def create_menu() -> None:
         .set_title_align('center')
         .set_subtitle_align('center')
         .show_prologue_top_border(True),
-        show_exit_option=False
+        show_exit_option=False,
+        clear_screen=False,
     )
     playback_start_menu_item = FunctionItem(
         text='Start', 
@@ -148,7 +149,8 @@ def create_menu() -> None:
         .set_subtitle_align('center')
         .set_prologue_text_align('center')
         .show_prologue_bottom_border(True),
-        show_exit_option=False
+        show_exit_option=False,
+        clear_screen=False,
     )
 
     record_change_instrument_menu_item = FunctionItem(

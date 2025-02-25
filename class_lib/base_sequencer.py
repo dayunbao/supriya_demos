@@ -16,7 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 from abc import ABC, abstractmethod
 
-from supriya.clocks import Clock
+from supriya.clocks import Clock, ClockContext
+from supriya.clocks.ephemera import TimeUnit
 
 from .midi_handler import MIDIHandler
 
@@ -28,13 +29,50 @@ class BaseSequencer(ABC):
     ):
         self._bpm: int = bpm
         self._clock = self._initialize_clock()
+        self._clock_event_id: int | None = None
         self._quantization = quantization
-        self.SEQUENCER_STEPS: int = 16
+        self._quantization_delta = self._convert_quantization_to_delta(quantization=quantization)
+        self._SEQUENCER_STEPS: int = 16
+        self._track_length_in_measures = self._compute_track_length_in_measures()
 
     @property
     @abstractmethod
     def midi_handler(self) -> MIDIHandler:
         pass
+
+    @property
+    def bpm(self) -> int:
+        return self._bpm
+    
+    @bpm.setter
+    def bpm(self, bpm: int) -> None:
+        self._bpm = bpm
+        self._clock.change(beats_per_minute=self._bpm)
+
+    @property
+    def quantization(self) -> str:
+        return self._quantization
+    
+    @quantization.setter
+    def quantization(self, quantization: str) -> None:
+        self._quantization = quantization
+        self.quantization_delta = self._convert_quantization_to_delta(quantization=quantization)
+    
+    @property
+    def quantization_delta(self) -> float:
+        return self._quantization_delta
+    
+    @quantization_delta.setter
+    def quantization_delta(self, quantization_delta: float) -> None:
+        self._quantization_delta = quantization_delta
+    
+    def _compute_track_length_in_measures(self) -> int:
+        return self._SEQUENCER_STEPS / int(self.quantization.split('/')[1])
+
+    def _convert_quantization_to_delta(self, quantization: str) -> float:
+        # This helper function converts a string like '1/16' into a numeric value
+        # used by the clock.
+        return self._clock.quantization_to_beats(quantization=quantization)
 
     def exit(self) -> None:        
         self.midi_handler.exit()
@@ -43,6 +81,24 @@ class BaseSequencer(ABC):
         """Initialize the Supriya's Clock."""
         clock = Clock()
         clock.change(beats_per_minute=self._bpm)
-        clock.start()
 
         return clock
+
+    @abstractmethod
+    def sequencer_clock_callback(
+            self, 
+            context = ClockContext, 
+            delta=0.0625, 
+            time_unit=TimeUnit.BEATS,
+    ) -> tuple[float, TimeUnit]:
+        pass
+
+    @abstractmethod
+    def start_playback(self) -> None:
+        """Start playing the track."""
+        pass
+
+    def stop_playback(self) -> None:
+        """Stop playing track."""
+        if self._clock_event_id is not None:
+            self._clock.cancel(self._clock_event_id)

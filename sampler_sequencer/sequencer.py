@@ -15,8 +15,12 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 from collections import defaultdict
+from typing import Optional
 
 from mido import Message
+
+from supriya.clocks import ClockContext
+from supriya.clocks.ephemera import TimeUnit
 
 from class_lib import MIDIHandler
 from class_lib import BaseSequencer
@@ -34,18 +38,11 @@ class Sequencer(BaseSequencer):
         self._instruments = instruments
         self._midi_handler = self._initialize_midi_handler()
         self._is_recording = False
+        self.previous_measure = 1
+        self.playing_tracks: list[Track] = []
         self._tracks: dict[str, list[Track]] = self._initialize_tracks()
         self._selected_instrument = list(self._instruments.values())[0]
         self._selected_track = self._tracks[self._selected_instrument.name][0]
-
-    @property
-    def bpm(self) -> int:
-        return self._bpm
-    
-    @bpm.setter
-    def bpm(self, bpm: int) -> None:
-        self._bpm = bpm
-        self._clock.change(beats_per_minute=self._bpm)
 
     @property
     def instruments(self) -> dict[str, BaseInstrument]:
@@ -56,22 +53,15 @@ class Sequencer(BaseSequencer):
         self._instruments = instruments
 
     @property
-    def quantization(self) -> str:
-        return self._quantization
-    
-    @quantization.setter
-    def quantization(self, quantization: str) -> None:
-        self._quantization = quantization
-
-    @property
     def is_recording(self) -> bool:
         return self._is_recording
     
     @is_recording.setter
     def is_recording(self, is_recording: bool) -> None:
         self._is_recording = is_recording
-        for t in self.tracks:
-            t.is_recording = self._is_recording
+        for tracks in self.tracks.values():
+            for track in tracks:
+                track.is_recording = self._is_recording
 
     @property
     def midi_handler(self) -> MIDIHandler:
@@ -112,17 +102,21 @@ class Sequencer(BaseSequencer):
         self.selected_track = self.tracks[instrument_name][track_number]
 
     def add_track(self, instrument_name: str) -> None:
-        added_track_number = 1
+        added_track_number = 0
+        starting_measure = 0
+        
         if len(self.tracks[instrument_name]) > 0:
-            added_track_number= self.tracks[instrument_name][-1].track_number + 1
+            added_track_number = self.tracks[instrument_name][-1].track_number + 1
+            starting_measure = self._track_length_in_measures * added_track_number
         
         self.tracks[instrument_name].append(
             Track(
                 clock=self._clock,
-                is_recording=self.is_recording,
-                quantization=self.quantization,
-                sequencer_steps=self.SEQUENCER_STEPS,
                 instrument=self.instruments[instrument_name],
+                is_recording=self.is_recording,
+                quantization_delta=self.quantization_delta,
+                sequencer_steps=self._SEQUENCER_STEPS,
+                starting_measure=starting_measure,
                 track_number=added_track_number,
             )
         )
@@ -150,10 +144,11 @@ class Sequencer(BaseSequencer):
             tracks_by_instrument[instrument.name].append(
                 Track(
                     clock=self._clock,
-                    is_recording=self.is_recording,
-                    quantization=self._quantization,
-                    sequencer_steps=self.SEQUENCER_STEPS,
                     instrument=instrument,
+                    is_recording=self.is_recording,
+                    quantization_delta=self.quantization_delta,
+                    sequencer_steps=self._SEQUENCER_STEPS,
+                    starting_measure=0,
                     track_number=0,
                 )
             )
@@ -161,17 +156,59 @@ class Sequencer(BaseSequencer):
         return tracks_by_instrument
 
     def handle_midi_message(self, message: Message) -> None:
-        # The tracks' instrument are responsible for playing notes
-        # We play a note whether or note we're recording. 
-        for track in self.tracks.values():
-            track.handle_midi_message(message=message)
+        """
+        If recording, we only want to play the selected instrument.
+        During playback, we need to play all of the instruments.
+        """
+        if not self.is_recording:
+            # Just play, don't record.
+            self.selected_instrument.handle_midi_message(message=message)
+        else:
+            self.selected_track.handle_midi_message(message=message)
     
-    def start_playback(self) -> None:
-        for track in self.tracks.values():
-            track.start_playback()
+    def sequencer_clock_callback(
+        self, 
+        context=ClockContext, 
+        delta=0.0625, 
+        time_unit=TimeUnit.BEATS,
+    ) -> tuple[float, TimeUnit]:
+        if context.event.invocations == 0:
+            self.start_tracks_playback(measure=1)
 
-    def stop_playback(self) -> None:
-        for track in self.tracks.values():
+        if self._is_new_measure(current_measure=context.desired_moment.measure) and context.desired_moment.measure % self._track_length_in_measures == 0:
+            self.stop_tracks_playback()
+            self.start_tracks_playback(measure=context.desired_moment.measure)
+
+        delta = self.quantization_delta
+        return delta, time_unit
+
+    def _is_new_measure(self, current_measure) -> bool:
+        if current_measure == self.previous_measure:
+            return False
+        else:
+            self.previous_measure = current_measure
+            return True
+
+    def start_playback(self) -> None:
+        self._clock.start()
+        self._clock_event_id = self._clock.cue(procedure=self.sequencer_clock_callback)
+
+    def start_tracks_playback(self, measure: int, quantization: Optional[str | None]=None) -> None:
+        if self.playing_tracks:
+            self.playing_tracks.clear()
+        
+        for tracks in self.tracks.values():
+            if (measure - 1) < len(tracks):
+                self.playing_tracks.append(tracks[measure - 1])
+        
+        if not self.playing_tracks:
+            self.stop_tracks_playback()
+
+        for track in self.playing_tracks:
+            track.start_playback(quantization=quantization)
+
+    def stop_tracks_playback(self) -> None:
+        for track in self.playing_tracks:
             track.stop_playback()
 
     def start_recording(self) -> None:

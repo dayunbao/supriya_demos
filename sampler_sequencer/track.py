@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import Optional
 
 from mido import Message
 
@@ -11,17 +12,19 @@ class Track(BaseTrack):
     def __init__(
             self, 
             clock: Clock,
-            is_recording: bool,
-            quantization: str, 
-            sequencer_steps: int,
             instrument: BaseInstrument,
+            is_recording: bool,
+            quantization_delta: float, 
+            sequencer_steps: int,
+            starting_measure: int,
             track_number: int,
         ):
         super().__init__(
             clock, 
             instrument, 
-            quantization, 
+            quantization_delta, 
             sequencer_steps, 
+            starting_measure,
             track_number,
         )
         self._is_recording = is_recording
@@ -50,9 +53,9 @@ class Track(BaseTrack):
             # on the scaled value of the message's note.
             # This makes playback very simple because for each invocation of 
             # the clock's callback, we can simply check for messages at the delta.
-            recorded_time = (message.note % self.sequencer_steps) * self.quantization_delta
+            recorded_time = (message.note % self._sequencer_steps) * self.quantization_delta
             recorded_message = message.copy(time=recorded_time)
-            self._recorded_notes[recorded_time].append(recorded_message)
+            self.recorded_notes[recorded_time].append(recorded_message)
 
 
     def track_clock_callback(
@@ -69,14 +72,14 @@ class Track(BaseTrack):
         you can specify SECONDS as the time_unit to have it called outside of a 
         musical rhythmic context.
         """
-        recorded_notes_index = delta * (context.event.invocations % self.sequencer_steps )
+        recorded_notes_index = delta * (context.event.invocations % self._sequencer_steps )
 
-        midi_messages = self._recorded_notes[recorded_notes_index]
+        midi_messages = self.recorded_notes[recorded_notes_index]
         for message in midi_messages:
             self._instrument.handle_midi_message(message=message)
         
-        delta = self._quantization_delta
+        delta = self.quantization_delta
         return delta, time_unit
     
-    def start_playback(self) -> None:
-        self._clock_event_id = self._clock.cue(procedure=self.track_clock_callback, quantization='1/4')
+    def start_playback(self, quantization: Optional[str | None]=None) -> None:
+        self._clock_event_id = self._clock.cue(procedure=self.track_clock_callback, quantization=quantization)

@@ -10,39 +10,26 @@ class BaseTrack(ABC):
         self, 
         clock: Clock,
         instrument: BaseInstrument,
-        quantization: str,
+        quantization_delta: str,
         sequencer_steps: int,
         track_number: int,
+        starting_measure: int,
     ):
-        self._track_number = track_number
         self._clock = clock
         self._clock_event_id: int | None = None
-        self._quantization = quantization
-        self._quantization_delta = self._convert_quantization_to_delta(quantization=quantization)
-        self._sequencer_steps =  sequencer_steps
         self._instrument = instrument
-    
-    def __str__(self) -> str:
-        return f'Track: {self._track_number}, \
-        Quantization: {self._quantization}, \
-        Instrument: {self._instrument}'
-    
-    @property
-    def track_number(self) -> int:
-        return self._track_number
-    
-    @track_number.setter
-    def track_number(self, track_number: int) -> None:
+        self._quantization_delta = quantization_delta
+        self._sequencer_steps =  sequencer_steps
+        self._starting_measure = starting_measure
         self._track_number = track_number
 
     @property
-    def quantization(self) -> str:
-        return self._quantization
+    def quantization_delta(self) -> str:
+        return self._quantization_delta
     
-    @quantization.setter
-    def quantization(self, quantization: str) -> None:
-        self._quantization = quantization
-        self.quantization_delta = self._convert_quantization_to_delta(quantization=quantization)
+    @quantization_delta.setter
+    def quantization_delta(self, quantization_delta: float) -> None:
+        self._quantization_delta = quantization_delta
 
     @property
     @abstractmethod
@@ -50,10 +37,21 @@ class BaseTrack(ABC):
         """Leave choice of data structure to child classes."""
         pass
 
-    def _convert_quantization_to_delta(self, quantization: str) -> float:
-        # This helper function converts a string like '1/16' into a numeric value
-        # used by the clock.
-        return self._clock.quantization_to_beats(quantization=quantization)
+    @property
+    def starting_measure(self) -> int:
+        return self._starting_measure
+    
+    @starting_measure.setter
+    def starting_measure(self, starting_measure: int) -> None:
+        self._starting_measure = starting_measure
+
+    @property
+    def track_number(self) -> int:
+        return self._track_number
+    
+    @track_number.setter
+    def track_number(self, track_number: int) -> None:
+        self._track_number = track_number
 
     @abstractmethod
     def erase_recorded_notes(self) -> None:

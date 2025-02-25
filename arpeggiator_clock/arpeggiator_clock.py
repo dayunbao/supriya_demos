@@ -28,7 +28,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 import re
 import sys
-from typing import get_args, Union
+from concurrent.futures import Future
+from typing import get_args
 
 import click
 
@@ -39,21 +40,12 @@ from supriya.clocks.ephemera import TimeUnit
 from supriya.conversions import midi_note_number_to_frequency
 from supriya.ugens import EnvGen, Limiter, LFSaw, Out
 
-server: Server
-clock: Clock
-clock_event_id: int
-iterations: int
-notes: list[float]
-quantization_delta: float
-stop_playing: bool = False
-
-
 
 ########################################
 ####### General Python functions #######
 ########################################
 
-def create_notes(chord_data: list, direction: str) -> None:
+def create_notes(chord_data: list, direction: str) -> list[float]:
     """Convert the chord and arpeggiator direction to a list of MIDI notes.
 
     Args:
@@ -67,8 +59,6 @@ def create_notes(chord_data: list, direction: str) -> None:
     Returns:
         A list of floats that represent the frequencies of the notes to play in hertz.
     """
-    global notes
-
     # A dictionary containing scale degrees for major and minor keys.
     # The list of ints represents how many half steps are required
     # to reach the note in the scale, where 0 represents the
@@ -100,9 +90,9 @@ def create_notes(chord_data: list, direction: str) -> None:
 
     # SynthDefs take frequencies in hertz, not MIDI notes.
     # So we need to convert them.
-    notes = [midi_note_number_to_frequency(x) for x in midi_notes]
+    return [midi_note_number_to_frequency(x) for x in midi_notes]
 
-def get_note_offset(root: str, accidental: Union[str, None]) -> int:
+def get_note_offset(root: str, accidental: str | None) -> int:
     """Get a offset from 0 (C natural).
 
     In order to convert something like Eb5 to a MIDI note, one thing that must 
@@ -150,7 +140,7 @@ def get_scale_degrees_indices(direction: str) -> list[int]:
 
     Args:
         direction: a string indicating whether notes are played
-        in asending order, descending order, or both.
+        in ascending order, descending order, or both.
     
     Returns:
         a list of ints that will be used to index an array
@@ -162,7 +152,7 @@ def get_scale_degrees_indices(direction: str) -> list[int]:
     else:
         return [0, 2, 4, 6, 4, 2]
 
-def parse_chord(chord: str) -> list:
+def parse_chord(chord: str) -> list[str | None]:
     """Split the chord user input into relevant parts
 
     Args:
@@ -172,7 +162,7 @@ def parse_chord(chord: str) -> list:
         The input split into a list, with None used in place
         of an accidental when one was not provided.
     """
-    split_chord: list[Union[str, None]] = list(chord)
+    split_chord: list[str | None] = list(chord)
     if len(split_chord) < 4:
         split_chord.insert(1, None)
 
@@ -224,10 +214,8 @@ def start(bpm: int, quantization: str, chord: str, direction: str, repetitions: 
         direction: a string indicating whether notes are played in ascending order, descending order, or both.
         repetitions: how many times the arpeggio should play. 0 means to play infinitely.
     """
-    global iterations
-    global stop_playing
-
     arp_direction = direction.lower()
+    
     verify_arp_direction(direction=arp_direction)
     verify_chord(chord=chord)
     verify_bpm(bpm=bpm)
@@ -235,19 +223,35 @@ def start(bpm: int, quantization: str, chord: str, direction: str, repetitions: 
     
     iterations = repetitions
     chord_data = parse_chord(chord=chord)
-    create_notes(chord_data=chord_data, direction=arp_direction)
-    initialize(bpm=bpm, quantization=quantization)
-    start_arpeggiator()
+    notes = create_notes(chord_data=chord_data, direction=arp_direction)
+    server = initialize_server()
+    clock = initialize_clock(bpm=bpm)
+    quantization_delta = clock.quantization_to_beats(quantization=quantization)
+    future: Future = Future()
+    clock_event_id = start_arpeggiator(
+        clock=clock, 
+        future=future,
+        iterations=iterations, 
+        notes=notes,
+        quantization_delta=quantization_delta,
+        server=server,
+    )
 
-    while True:
-        if stop_playing:
-            stop_arpeggiator()
+    future.result()
+    stop_arpeggiator(clock=clock, clock_event_id=clock_event_id, server=server)
 
 ########################################
 ###### Supriya specific functions ######
 ########################################
 
-def arpeggiator_clock_callback(context = ClockContext, delta=0.0625, time_unit=TimeUnit.BEATS) -> tuple[float, TimeUnit]:
+def arpeggiator_clock_callback(
+        context:ClockContext, 
+        delta: float, 
+        future: Future,
+        iterations: int,
+        notes: list[float],
+        server: Server,
+) -> tuple[float, TimeUnit] | None:
     """The function that runs on each invocation.
 
     The callback is executed once every `delta`.  What delta means depends on time_unit.  
@@ -256,52 +260,32 @@ def arpeggiator_clock_callback(context = ClockContext, delta=0.0625, time_unit=T
     you can specify SECONDS as the time_unit to have it called outside of a 
     musical rhythmic context.
     """
-    global iterations
-    global notes
-    global quantization_delta
-    global stop_playing
-
-    if iterations != 0 and context.event.invocations == (iterations * len(notes)) - 1:
-        stop_playing = True
+    if iterations != 0 and context.event.invocations == (iterations * len(notes)):
+        future.set_result(True)
+        return None
 
     notes_index = context.event.invocations % len(notes)
-    play_note(note=notes[notes_index])
+    _ = server.add_synth(synthdef=saw, frequency=notes[notes_index])
     
-    delta = quantization_delta 
-    return delta, time_unit
+    return delta, TimeUnit.BEATS
 
-def initialize(bpm: int, quantization: str) -> None:
-    """Initialize the relevant Supriya objects."""
-    global clock
-    global clock_event_id
-    global quantization_delta
-    global server
-    
+def initialize_server() -> Server:
+    """Initialize the server and load the SynthDef."""
     server = Server().boot()
     _ = server.add_synthdefs(saw)
     # Wait for the server to fully load the SynthDef before proceeding.
     server.sync()
 
+    return server
+
+def initialize_clock(bpm: int) -> Clock:
+    """Set up the clock."""
     clock = Clock()
     # Set the BPM of the clock
     clock.change(beats_per_minute=bpm)
-    # This helper function converts a string like '1/16' into a numeric value
-    # used by the clock.
-    quantization_delta = clock.quantization_to_beats(quantization=quantization)
     clock.start()
 
-def play_note(note: float) -> None:
-    """Create a synth, which automatically plays the note.
-
-    Synths in SuperCollider can be persistent, but are generally treated
-    as ephemeral objects.  They are highly optimized in SuperCollider's
-    server so that creating many in a short time is efficient.
-    """
-    global server
-    
-    # We don't need to worry about deallocating anything as that is
-    # handled in the SynthDef.
-    _ = server.add_synth(synthdef=saw, frequency=note)
+    return clock
 
 @synthdef()
 def saw(frequency=440.0, amplitude=0.5) -> None:
@@ -332,19 +316,29 @@ def saw(frequency=440.0, amplitude=0.5) -> None:
 
     Out.ar(bus=0, source=signal)
 
-def start_arpeggiator() -> None:
+def start_arpeggiator(
+        clock: Clock, 
+        iterations: int, 
+        future: Future,
+        notes: list[float], 
+        quantization_delta: float, 
+        server: Server
+) -> int:
     """Start the arpeggiator by cueing the callback on the clock."""
-    global clock_event_id
+    return clock.cue(
+        procedure=arpeggiator_clock_callback, 
+        quantization='1/4', # Set the arpeggiator to begin playing on the next quarter note.
+        kwargs={
+            'delta': quantization_delta, 
+            'future': future,
+            'iterations': iterations,
+            'notes': notes,
+            'server': server,
+        }
+    )
 
-    # Set the arpeggiator to begin playing on the next quarter note.
-    clock_event_id = clock.cue(procedure=arpeggiator_clock_callback, quantization='1/4')
-
-def stop_arpeggiator() -> None:
-    """Stop the clock and exit the program."""
-    global clock
-    global clock_event_id
-    global server
-    
+def stop_arpeggiator(clock: Clock, clock_event_id: int, server: Server) -> None:
+    """Stop the clock and exit the program."""    
     clock.cancel(event_id=clock_event_id)
     clock.stop()
     server.quit()

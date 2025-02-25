@@ -14,6 +14,8 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License 
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
+from collections import defaultdict
+
 from mido import Message
 
 from class_lib import MIDIHandler
@@ -25,14 +27,16 @@ class Sequencer(BaseSequencer):
     def __init__(
             self, 
             bpm: int, 
-            instruments: list[BaseInstrument],
+            instruments: dict[str, BaseInstrument],
             quantization: str,
     ):
         super().__init__(bpm, quantization)
         self._instruments = instruments
         self._midi_handler = self._initialize_midi_handler()
         self._is_recording = False
-        self._tracks: list[Track] = self._initialize_tracks()
+        self._tracks: dict[str, list[Track]] = self._initialize_tracks()
+        self._selected_instrument = list(self._instruments.values())[0]
+        self._selected_track = self._tracks[self._selected_instrument.name][0]
 
     @property
     def bpm(self) -> int:
@@ -44,11 +48,11 @@ class Sequencer(BaseSequencer):
         self._clock.change(beats_per_minute=self._bpm)
 
     @property
-    def instruments(self) -> list[BaseInstrument]:
+    def instruments(self) -> dict[str, BaseInstrument]:
         return self._instruments
     
     @instruments.setter
-    def instruments(self, instruments: list[BaseInstrument]) -> None:
+    def instruments(self, instruments: dict[str, BaseInstrument]) -> None:
         self._instruments = instruments
 
     @property
@@ -78,67 +82,96 @@ class Sequencer(BaseSequencer):
         self._midi_handler = midi_handler
 
     @property
-    def tracks(self) -> list[Track]:
+    def tracks(self) -> dict[str, list[Track]]:
         return self._tracks
     
     @tracks.setter
-    def tracks(self, tracks: list[Track]) -> None:
+    def tracks(self, tracks: dict[str, list[Track]]) -> None:
         self._tracks = tracks
 
+    @property
+    def selected_instrument(self) -> BaseInstrument:
+        return self._selected_instrument
+
+    @selected_instrument.setter
+    def selected_instrument(self, instrument: BaseInstrument) -> None:
+        self._selected_instrument = instrument
+
+    @property
+    def selected_track(self) -> Track:
+        return self._selected_track
+    
+    @selected_track.setter
+    def selected_track(self, track: Track) -> None:
+        self._selected_track = track
+
+    def set_selected_instrument_by_name(self, name: str) -> None:
+        self.selected_instrument = self.instruments[name]
+
+    def set_selected_track_by_track_number(self, instrument_name: str, track_number: int) -> None:
+        self.selected_track = self.tracks[instrument_name][track_number]
+
     def add_track(self, instrument_name: str) -> None:
-        instrument_index = 0
-        for index, instrument in enumerate(self.instruments):
-            if instrument_name ==  instrument.name:
-                instrument_index = index
+        added_track_number = 1
+        if len(self.tracks[instrument_name]) > 0:
+            added_track_number= self.tracks[instrument_name][-1].track_number + 1
         
-        track = Track(
-            clock=self._clock,
-            is_recording=self.is_recording,
-            quantization=self.quantization,
-            sequencer_steps=self.SEQUENCER_STEPS,
-            instrument=self._instruments[instrument_index],
-            track_number=self.tracks[-1].track_number + 1,
+        self.tracks[instrument_name].append(
+            Track(
+                clock=self._clock,
+                is_recording=self.is_recording,
+                quantization=self.quantization,
+                sequencer_steps=self.SEQUENCER_STEPS,
+                instrument=self.instruments[instrument_name],
+                track_number=added_track_number,
+            )
         )
 
-        self.tracks.append(track)
+    def delete_track(self, instrument_name: str, track_number: int) -> None:
+        removed_track_number = self.tracks[instrument_name][track_number].track_number
+        del self.tracks[instrument_name][track_number]
+        num_tracks = len(self.tracks[instrument_name])
 
-    def get_tracks_strings(self) -> list[str]:
-        return [str(t) for t in self.tracks]
+        for tn in range(removed_track_number, num_tracks):
+            self.tracks[instrument_name][tn].track_number = tn
 
-    def delete_track(self, track_num) -> None:
-        removed = self.tracks.pop(track_num)
-        for t in range(removed.track_number):
-            self.tracks[t].track_number = t
+    def get_selected_instrument_name(self) -> str:
+        return self._selected_instrument.name
+    
+    def get_selected_track_number(self) -> int:
+        return self._selected_track.track_number
 
     def _initialize_midi_handler(self) -> MIDIHandler:
         return MIDIHandler(message_handler_callback=self.handle_midi_message)
 
-    def _initialize_tracks(self) -> list[Track]:
-        track = Track(
-            clock=self._clock,
-            is_recording=self.is_recording,
-            quantization=self._quantization,
-            sequencer_steps=self.SEQUENCER_STEPS,
-            # Default to the first available
-            instrument=self._instruments[0],
-            track_number=0,
-        )
+    def _initialize_tracks(self) -> dict[str, list[Track]]:
+        tracks_by_instrument = defaultdict(list)
+        for instrument in self.instruments.values():
+            tracks_by_instrument[instrument.name].append(
+                Track(
+                    clock=self._clock,
+                    is_recording=self.is_recording,
+                    quantization=self._quantization,
+                    sequencer_steps=self.SEQUENCER_STEPS,
+                    instrument=instrument,
+                    track_number=0,
+                )
+            )
         
-        return [track]
+        return tracks_by_instrument
 
     def handle_midi_message(self, message: Message) -> None:
         # The tracks' instrument are responsible for playing notes
         # We play a note whether or note we're recording. 
-        for track in self.tracks:
+        for track in self.tracks.values():
             track.handle_midi_message(message=message)
     
     def start_playback(self) -> None:
-        """Start playing back all of the tracks."""
-        for track in self.tracks:
+        for track in self.tracks.values():
             track.start_playback()
 
     def stop_playback(self) -> None:
-        for track in self.tracks:
+        for track in self.tracks.values():
             track.stop_playback()
 
     def start_recording(self) -> None:

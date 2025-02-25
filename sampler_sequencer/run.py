@@ -11,8 +11,9 @@ from supriya.clocks.bases import Quantization
 
 from .sampler import Sampler
 from .sequencer import Sequencer
+from .sp_303 import SP303
 
-from .synth_defs import sample_player
+from .synth_defs import sample_player, sp_303
 
 
 class BPMValidator(BaseValidator):
@@ -36,7 +37,7 @@ class QuantizationValidator(BaseValidator):
 
         return result
 
-class TrackAddValidator(BaseValidator):
+class InstrumentNameValidator(BaseValidator):
     def __init__(self, instruments: list[str]):
         super().__init__()
         self.instruments = instruments
@@ -48,7 +49,7 @@ class TrackAddValidator(BaseValidator):
 
         return result
 
-class TrackDeleteValidator(BaseValidator):
+class TrackNumberValidator(BaseValidator):
     def __init__(self, number_of_tracks: int):
         super().__init__()
         self.number_of_tracks = number_of_tracks
@@ -73,9 +74,16 @@ def initialize_sequencer(bpm: int, quantization: str) -> None:
         server=server, 
         synth_definition=sample_player
     )
+
+    supriya_303 = SP303(
+        midi_channels=[x for x in range(16)],
+        server=server, 
+        synth_definition=sp_303
+    )
+
     sequencer = Sequencer(
         bpm=bpm, 
-        instruments=[sampler],
+        instruments={sampler.name: sampler, supriya_303.name: supriya_303},
         quantization=quantization,
     )
 
@@ -134,24 +142,47 @@ def create_menu() -> None:
     ####################
     record_menu = ConsoleMenu(
         title='Record', 
-        prologue_text='',
+        prologue_text=create_record_menu_prologue,
         formatter=MenuFormatBuilder()
         .set_title_align('center')
         .set_subtitle_align('center')
-        .show_prologue_top_border(True),
+        .set_prologue_text_align('center')
+        .show_prologue_bottom_border(True),
         show_exit_option=False
     )
+
+    record_change_instrument_menu_item = FunctionItem(
+        text='Change instrument',
+        function=change_instrument,
+        menu=record_menu,
+    )
+
+    record_change_track_menu_item = FunctionItem(
+        text='Change track',
+        function=change_track,
+        menu=record_menu,
+    )
+
+    record_change_both_menu_item = FunctionItem(
+        text='Change instrument and track',
+        function=change_both,
+        menu=record_menu,
+    )
+
     record_start_menu_item = FunctionItem(
         text='Start', 
         function=sequencer.start_recording,
-        menu=playback_menu,
+        menu=record_menu,
     )
     record_stop_menu_item = FunctionItem(
         text='Stop', 
         function=sequencer.stop_recording,
-        menu=playback_menu,
+        menu=record_menu,
     )
 
+    record_menu.append_item(record_change_instrument_menu_item)
+    record_menu.append_item(record_change_track_menu_item)
+    record_menu.append_item(record_change_both_menu_item)
     record_menu.append_item(record_start_menu_item)
     record_menu.append_item(record_stop_menu_item)
     record_menu.append_item(back_to_main_menu_item)
@@ -232,15 +263,92 @@ def get_current_sequencer_settings() -> str:
 def get_current_number_of_tracks() -> str:
     global sequencer
 
-    return f'Current number of tracks = {len(sequencer.tracks)}'
+    
+    instruments_num_tracks_str = ''
+    for name, tracks in sequencer.tracks.items():
+        instruments_num_tracks_str += f'{name}: {len(tracks)}\n'
 
-def add_track() -> None:
-    global TrackAddValidator
+    prologue_text = f'Current number of tracks\n{instruments_num_tracks_str}'
+
+    return prologue_text
+
+def create_record_menu_prologue() -> str:
+    global sequencer
+
+    selected_instrument_name = sequencer.get_selected_instrument_name()
+    selected_track_number = f'{sequencer.get_selected_track_number() + 1}'
+    record_menu_prologue_text = f'Selected instrument: {selected_instrument_name}\nSelected track number: {selected_track_number}'
+
+    return record_menu_prologue_text
+
+def change_instrument() -> None:
+    global InstrumentNameValidator
     global sequencer
 
     prompt_util = PromptUtils(screen=menu.screen)
-    instrument_names = [i.name for i in sequencer.instruments]
-    track_add_validator = TrackAddValidator(instruments=instrument_names)
+    instrument_names = [name for name in sequencer.instruments.keys()]
+    instrument_name_validator = InstrumentNameValidator(instruments=instrument_names)
+
+    joined_names = ', '.join(instrument_names)
+    prompt = f'Enter one of the following instruments: {joined_names}'
+
+    try:
+        name, is_valid = prompt_util.input(
+            prompt=prompt,
+            enable_quit=True,
+            validators=[instrument_name_validator]
+        )
+        if is_valid:
+            sequencer.set_selected_instrument_by_name(name=name) 
+        else:    
+            prompt_util.println(f'Invalid instrument name provided: {name}')
+            return
+    except UserQuit:
+        return
+
+def change_track() -> None:
+    global TrackNumberValidator
+    global sequencer
+
+    prompt_util = PromptUtils(screen=menu.screen)
+    selected_instrument = sequencer.selected_instrument.name
+    num_tracks = len(sequencer.tracks[selected_instrument])
+    track_number_validator = TrackNumberValidator(number_of_tracks=num_tracks)
+
+    prompt = 'Enter a number in the range '
+    if num_tracks > 1:
+        prompt += f'1-{num_tracks}'
+    else:
+        prompt += f'{num_tracks}'
+
+    try:
+        track_number, is_valid = prompt_util.input(
+            prompt=prompt,
+            enable_quit=True,
+            validators=[track_number_validator]
+        )
+        if is_valid:
+            sequencer.set_selected_track_by_track_number(
+                instrument_name=selected_instrument,
+                track_number=int(track_number) - 1
+            )
+        else:    
+            prompt_util.println(f'Invalid track number provided: {track_number}')
+            return
+    except UserQuit:
+        return
+
+def change_both() -> None:
+    change_instrument()
+    change_track()
+
+def add_track() -> None:
+    global InstrumentNameValidator
+    global sequencer
+
+    prompt_util = PromptUtils(screen=menu.screen)
+    instrument_names = [name for name in sequencer.instruments.keys()]
+    track_add_validator = InstrumentNameValidator(instruments=instrument_names)
 
     joined_names = ', '.join(instrument_names)
     prompt = f'Enter one of the following instruments: {joined_names}'
@@ -260,18 +368,39 @@ def add_track() -> None:
         return
 
 def delete_track() -> None:
-    global TrackDeleteValidator
+    global TrackNumberValidator
     global sequencer
 
     prompt_util = PromptUtils(screen=menu.screen)
-    num_tracks = len(sequencer.tracks)
-    track_delete_validator = TrackDeleteValidator(number_of_tracks=num_tracks)
+
+    instrument_names = [name for name in sequencer.instruments.keys()]
+    track_add_validator = InstrumentNameValidator(instruments=instrument_names)
+
+    joined_names = ', '.join(instrument_names)
+    prompt = f'Enter one of the following instruments: {joined_names}'
+
+    try:
+        name, is_valid = prompt_util.input(
+            prompt=prompt,
+            enable_quit=True,
+            validators=[track_add_validator]
+        )
+        if is_valid:
+            pass
+        else:    
+            prompt_util.println(f'Invalid instrument name provided: {name}')
+            return
+    except UserQuit:
+        return
+
+    num_tracks = len(sequencer.tracks[name])
+    track_delete_validator = TrackNumberValidator(number_of_tracks=num_tracks)
 
     prompt = 'Enter a number in the range '
     if num_tracks > 1:
         prompt += f'1-{num_tracks}'
     else:
-        prompt += num_tracks
+        prompt += f'{num_tracks}'
 
     try:
         track_number, is_valid = prompt_util.input(
@@ -280,7 +409,7 @@ def delete_track() -> None:
             validators=[track_delete_validator]
         )
         if is_valid:
-            sequencer.delete_track(int(track_number) - 1)
+            sequencer.delete_track(instrument_name=name, track_number=int(track_number) - 1)
         else:    
             prompt_util.println(f'Invalid track number provided: {track_number}')
             return

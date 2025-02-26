@@ -36,11 +36,6 @@ class BaseSequencer(ABC):
         self._track_length_in_measures = self._compute_track_length_in_measures()
 
     @property
-    @abstractmethod
-    def midi_handler(self) -> MIDIHandler:
-        pass
-
-    @property
     def bpm(self) -> int:
         return self._bpm
     
@@ -49,6 +44,11 @@ class BaseSequencer(ABC):
         self._bpm = bpm
         self._clock.change(beats_per_minute=self._bpm)
     
+    @property
+    @abstractmethod
+    def midi_handler(self) -> MIDIHandler:
+        pass
+
     def _compute_track_length_in_measures(self) -> int:
         return self._SEQUENCER_STEPS // int(self.quantization.split('/')[1])
 
@@ -70,9 +70,8 @@ class BaseSequencer(ABC):
     @abstractmethod
     def sequencer_clock_callback(
             self, 
-            context = ClockContext, 
-            delta=0.0625, 
-            time_unit=TimeUnit.BEATS,
+            context:ClockContext, 
+            delta: float,
     ) -> tuple[float, TimeUnit]:
         pass
 

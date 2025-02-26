@@ -54,11 +54,10 @@ class Track(BaseTrack):
             recorded_message = message.copy(time=recorded_time)
             self.recorded_notes[recorded_time].append(recorded_message)
 
-
     def track_clock_callback(
         self, 
         context:ClockContext, 
-        delta=float,
+        delta: float,
     ) -> tuple[float, TimeUnit]:
         """The function that runs on each invocation.
 

@@ -39,15 +39,15 @@ class BaseInstrument(ABC):
     def name(self):
         pass
     
-    def _load_synthdefs(self) -> None:
-        _ = self._server.add_synthdefs(self._synth_definition)
-        # Wait for the server to fully load the SynthDef before proceeding.
-        self._server.sync()
-    
     @abstractmethod
     def handle_midi_message(self, message: Message) -> None:
         pass
     
+    def _load_synthdefs(self) -> None:
+        self._server.add_synthdefs(self._synth_definition)
+        # Wait for the server to fully load the SynthDef before proceeding.
+        self._server.sync()
+
     @abstractmethod
     def _on_control_change(self, message: Message) -> None:
         """Handle a Control Change message.

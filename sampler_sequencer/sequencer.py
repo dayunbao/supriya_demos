@@ -91,14 +91,6 @@ class Sequencer(BaseSequencer):
                 track.quantization_delta = self._quantization_delta
 
     @property
-    def tracks(self) -> dict[str, list[Track]]:
-        return self._tracks
-    
-    @tracks.setter
-    def tracks(self, tracks: dict[str, list[Track]]) -> None:
-        self._tracks = tracks
-
-    @property
     def selected_instrument(self) -> BaseInstrument:
         return self._selected_instrument
 
@@ -114,11 +106,13 @@ class Sequencer(BaseSequencer):
     def selected_track(self, track: Track) -> None:
         self._selected_track = track
 
-    def set_selected_instrument_by_name(self, name: str) -> None:
-        self.selected_instrument = self.instruments[name]
-
-    def set_selected_track_by_track_number(self, instrument_name: str, track_number: int) -> None:
-        self.selected_track = self.tracks[instrument_name][track_number]
+    @property
+    def tracks(self) -> dict[str, list[Track]]:
+        return self._tracks
+    
+    @tracks.setter
+    def tracks(self, tracks: dict[str, list[Track]]) -> None:
+        self._tracks = tracks
 
     def add_track(self, instrument_name: str) -> None:
         added_track_number = 0
@@ -151,6 +145,18 @@ class Sequencer(BaseSequencer):
     def get_selected_track_number(self) -> int:
         return self._selected_track.track_number
 
+    def handle_midi_message(self, message: Message) -> None:
+        """
+        If recording, we only want to play the selected instrument.
+        During playback, we need to play all of the instruments.
+        """
+        if not self.is_recording:
+            # Just play, don't record.
+            self.selected_instrument.handle_midi_message(message=message)
+        else:
+            # The track will record and then send it to the instrument to play.
+            self.selected_track.handle_midi_message(message=message)
+    
     def _initialize_midi_handler(self) -> MIDIHandler:
         return MIDIHandler(message_handler_callback=self.handle_midi_message)
 
@@ -169,18 +175,6 @@ class Sequencer(BaseSequencer):
             )
         
         return tracks_by_instrument
-
-    def handle_midi_message(self, message: Message) -> None:
-        """
-        If recording, we only want to play the selected instrument.
-        During playback, we need to play all of the instruments.
-        """
-        if not self.is_recording:
-            # Just play, don't record.
-            self.selected_instrument.handle_midi_message(message=message)
-        else:
-            # The track will record and then send it to the instrument to play.
-            self.selected_track.handle_midi_message(message=message)
     
     def sequencer_clock_callback(
         self, 
@@ -193,6 +187,12 @@ class Sequencer(BaseSequencer):
 
         return delta, TimeUnit.BEATS
 
+    def set_selected_instrument_by_name(self, name: str) -> None:
+        self.selected_instrument = self.instruments[name]
+
+    def set_selected_track_by_track_number(self, instrument_name: str, track_number: int) -> None:
+        self.selected_track = self.tracks[instrument_name][track_number]
+
     def start_playback(self) -> None:
         self._clock.start()
         self._clock_event_id = self._clock.cue(
@@ -200,6 +200,12 @@ class Sequencer(BaseSequencer):
             procedure=self.sequencer_clock_callback
         )
 
+    def start_recording(self) -> None:
+        self.is_recording = True
+
+    def stop_recording(self) -> None:
+        self.is_recording = False
+    
     def start_tracks_playback(self, track_index: int) -> None:
         print(f'track_index in start_tracks_playback {track_index}')
         self.stop_tracks_playback()
@@ -219,9 +225,3 @@ class Sequencer(BaseSequencer):
     def stop_tracks_playback(self) -> None:
         for track in self.playing_tracks:
             track.stop_playback()
-
-    def start_recording(self) -> None:
-        self.is_recording = True
-
-    def stop_recording(self) -> None:
-        self.is_recording = False

@@ -19,10 +19,6 @@ class Sampler(BaseInstrument):
         self._load_synthdefs()
         self._name = 'Sampler'
 
-    def __str__(self):
-        channels = ', '.join([str(c) for c in self._midi_channels])
-        return f'Name: {self.name}, MIDI Channels: {channels}'
-
     @property
     def name(self) -> str:
         return self._name
@@ -30,14 +26,7 @@ class Sampler(BaseInstrument):
     @name.setter
     def name(self, name: str) -> str:
         self._name = name
-
-    def _load_buffers(self) -> list[Buffer]:
-        drum_buffers = []
-        for sample_path in sorted(self._drum_samples_path.rglob(pattern='*.wav')):
-            drum_buffers.append(self._server.add_buffer(file_path=str(sample_path)))
-        
-        return drum_buffers
-
+    
     def handle_midi_message(self, message: Message) -> None:
         if message.type == 'control_change':
             self._on_control_change(message=message)
@@ -47,6 +36,13 @@ class Sampler(BaseInstrument):
         
         if message.type == 'note_on':
             self._on_note_on(message=message)
+
+    def _load_buffers(self) -> list[Buffer]:
+        drum_buffers = []
+        for sample_path in sorted(self._drum_samples_path.rglob(pattern='*.wav')):
+            drum_buffers.append(self._server.add_buffer(file_path=str(sample_path)))
+        
+        return drum_buffers
 
     def _on_control_change(self, message: Message) -> None:
         """Handle a Control Change message.
@@ -72,7 +68,7 @@ class Sampler(BaseInstrument):
         """
         if message.channel in self._midi_channels:
             drum_buff = self._drum_buffers[message.channel]
-            _ = self._server.add_synth(
+            self._server.add_synth(
                 synthdef=self._synth_definition, 
                 drum_buff=drum_buff,
             )

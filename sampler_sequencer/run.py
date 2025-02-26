@@ -63,11 +63,8 @@ class TrackNumberValidator(BaseValidator):
         return result
 
 
-def add_track() -> None:
-    global InstrumentNameValidator
-    global sequencer
-
-    prompt_util = PromptUtils(screen=menu.screen)
+def add_track(sequencer: Sequencer) -> None:
+    prompt_util = PromptUtils()
     instrument_names = [name for name in sequencer.instruments.keys()]
     track_add_validator = InstrumentNameValidator(instruments=instrument_names)
 

@@ -28,35 +28,25 @@ from supriya.conversions import midi_note_number_to_frequency
 
 from synth_defs import delay, reverb, saw
 
+
 DELAY_CC_NUM: int = 0
-delay_synth: Synth
-effects_group: Group
-multi_inport: MultiPort
-notes: dict[int, Synth] = {}
-delay_bus: Bus
 REVERB_CC_NUM: int = 1
-reverb_synth: Synth
-server: Server
-synth_group: Group
 
-
-def create_effects_synths() -> None:
-    """Create the effects synths.
+def create_buses(server: Server) -> tuple[Bus, Bus]:
+    """Create buses.
 
     We need busses to route the saw synth's audio through,
     and groups to keep the order of execution correct on 
     the SuperCollider server.
     """
-    global delay_synth
-    global effects_group
-    global delay_bus
-    global reverb_synth
-    global server
-    
     delay_bus = server.add_bus(calculation_rate='audio')
     reverb_bus = server.add_bus(calculation_rate='audio')
 
-    delay_synth = effects_group.add_synth(
+    return delay_bus, reverb_bus
+
+def create_effects_synths(delay_bus: Bus, effects_group: Group, reverb_bus: Bus) -> None:
+    """Create the effects synths."""
+    effects_group.add_synth(
         synthdef=delay,
         in_bus=delay_bus,
         maximum_delay_time=0.2, 
@@ -65,7 +55,7 @@ def create_effects_synths() -> None:
         out_bus=reverb_bus
     )
 
-    reverb_synth = effects_group.add_synth(
+    effects_group.add_synth(
         synthdef=reverb,
         in_bus=reverb_bus,
         mix=0.33,
@@ -74,7 +64,7 @@ def create_effects_synths() -> None:
         out_bus=0,
     )
 
-def create_groups() -> None:
+def create_groups(server: Server) -> tuple[Group, Group]:
     """Create groups to hold the various synths.
 
     This is done because the saw synths need to be at the 
@@ -85,32 +75,29 @@ def create_groups() -> None:
     order, with the sound-producing synth's audio signal being at 
     the head, and the sound-consuming synths (effects) at the tail.
     """
-    global effects_group
-    global server
-    global synth_group
-
     # All of the ephemeral saw synths will be added to this group.
     synth_group = server.add_group()
     effects_group = server.add_group(add_action=AddAction.ADD_AFTER)
 
-def handle_midi_message(message: mido.Message) -> None:
-    """Deal with a new MIDI message.
+    return synth_group, effects_group
+
+def handle_midi_message(
+        delay_bus: Bus, 
+        effects_group: Group, 
+        message: mido.Message, 
+        notes: dict[int, Synth], 
+        synth_group: Group
+) -> None:
+    """Deal with a new MIDI message., 
 
     This function currently only handles Note On, Note Off 
     and Control Change messages.
-
-    Args:
-        message: a MIDI message.
     """
     global DELAY_CC_NUM
-    global delay_bus
-    global effects_group
-    global notes
     global REVERB_CC_NUM
-    global synth_group
 
     if message.type == 'note_on':
-        frequency = midi_note_number_to_frequency(midi_note_number=message.note)
+        frequency = midi_note_number_to_frequency(midi_note_number=message.note + 60)
         synth = synth_group.add_synth(synthdef=saw, frequency=frequency, out_bus=delay_bus)
         notes[message.note] = synth
 
@@ -129,36 +116,42 @@ def handle_midi_message(message: mido.Message) -> None:
             scaled_reverb_mix = scale_float(value=message.value, target_min=0.0, target_max=1.0)
             effects_group.set(mix=scaled_reverb_mix)
 
-def initialize_supriya() -> None:
-    """Initialize the relevant Supriya objects."""
-    global server
-    
+def initialize_server() -> Server:
+    """Initialize the server."""
     server = Server().boot()
     _ = server.add_synthdefs(delay, reverb, saw)
     # Wait for the server to fully load the SynthDef before proceeding.
     server.sync()
 
-def listen_for_midi_messages() -> None:
-    """Listen for incoming MIDI messages in a non-blocking way.
-    
-    mido's iter_pending() is non-blocking.
-    """
-    global multi_inport
+    return server
 
+def listen_for_midi_messages(
+        delay_bus: Bus, 
+        effects_group: Group, 
+        multi_inport: MultiPort,
+        notes: dict[int, Synth], 
+        synth_group: Group
+) -> None:
+    """Listen for incoming MIDI messages."""
     while True:
         for message in multi_inport.iter_pending():
-            handle_midi_message(message=message)
+            handle_midi_message(
+                delay_bus=delay_bus,
+                effects_group=effects_group,
+                message=message,
+                notes=notes,
+                synth_group=synth_group,
+            )
 
-def open_multi_inport() -> None:
+def open_multi_inport() -> MultiPort:
     """Create a MultiPort that accepts all incoming MIDI messages.
 
     This is the easiest way to handle the fact that people using
     this script could have an input port named anything.
     """
-    global multi_inport
-    
     inports = [mido.open_input(p) for p in mido.get_input_names()]
-    multi_inport = MultiPort(inports)
+    
+    return MultiPort(inports)
 
 def scale_float(value: int, target_min: float, target_max: float):
     """
@@ -176,9 +169,24 @@ def scale_float(value: int, target_min: float, target_max: float):
     scaled_value = (value - source_min) * (target_max - target_min) / (source_max - source_min) + target_min
     return round(number=scaled_value, ndigits=2)
 
+def main() -> None:
+    server = initialize_server()
+    synth_group, effects_group = create_groups(server=server)
+    delay_bus, reverb_bus = create_buses(server=server)
+    create_effects_synths(
+        delay_bus=delay_bus, 
+        effects_group=effects_group,
+        reverb_bus=reverb_bus
+    )
+    multi_inport = open_multi_inport()
+    notes: dict[int, Synth] = {}
+    listen_for_midi_messages(
+        delay_bus=delay_bus, 
+        effects_group=effects_group,
+        multi_inport=multi_inport,
+        notes=notes,
+        synth_group=synth_group
+    )
+
 if __name__ == '__main__':
-    initialize_supriya()
-    create_groups()
-    create_effects_synths()
-    open_multi_inport()
-    listen_for_midi_messages()
+    main()

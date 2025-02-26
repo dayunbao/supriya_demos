@@ -20,7 +20,6 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 import sys
-from concurrent.futures import Future
 from typing import get_args
 
 import click
@@ -36,10 +35,8 @@ def start(bpm: int, quantization: str) -> None:
     verify_bpm(bpm=bpm)
     verify_quantization(quantization=quantization)
 
-    drum_machine_future: Future = Future()
-    drum_machine = DrumMachine(bpm=bpm, drum_machine_future=drum_machine_future, quantization=quantization)
+    drum_machine = DrumMachine(bpm=bpm, quantization=quantization)
     drum_machine.run()
-    drum_machine_future.result()
     stop()
 
 def stop() -> None:

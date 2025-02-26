@@ -13,14 +13,12 @@ class BaseTrack(ABC):
         quantization_delta: str,
         sequencer_steps: int,
         track_number: int,
-        starting_measure: int,
     ):
         self._clock = clock
         self._clock_event_id: int | None = None
         self._instrument = instrument
         self._quantization_delta = quantization_delta
         self._sequencer_steps =  sequencer_steps
-        self._starting_measure = starting_measure
         self._track_number = track_number
 
     @property
@@ -38,14 +36,6 @@ class BaseTrack(ABC):
         pass
 
     @property
-    def starting_measure(self) -> int:
-        return self._starting_measure
-    
-    @starting_measure.setter
-    def starting_measure(self, starting_measure: int) -> None:
-        self._starting_measure = starting_measure
-
-    @property
     def track_number(self) -> int:
         return self._track_number
     
@@ -60,9 +50,8 @@ class BaseTrack(ABC):
     @abstractmethod
     def track_clock_callback(
             self, 
-            context = ClockContext, 
-            delta=0.0625, 
-            time_unit=TimeUnit.BEATS,
+            context:ClockContext, 
+            delta: float,
     ) -> tuple[float, TimeUnit]:
         pass
 

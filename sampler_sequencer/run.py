@@ -488,23 +488,10 @@ def initialize_server() -> None:
 
 def start() -> None:
     initialize_server()
-    initialize_sequencer(bpm=120, quantization='1/16')
+    initialize_sequencer(bpm=120, quantization='1/8')
     create_menu()
     start_menu()
     exit_program()
-
-def verify_quantization(quantization: str) -> None:
-    """Make sure the quantization is one that matches what's available.
-
-    Args:
-        quantization: a string in the form 1/4, 1/8T, etc.
-    """
-    if quantization not in get_args(Quantization):
-        print(f'Invalid quantization {quantization}.')
-        print('Please provide one of the following: ')
-        for q in get_args(Quantization):
-            print(q)
-        exit(1)
 
 if __name__ == '__main__':
     start()

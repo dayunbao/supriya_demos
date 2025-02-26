@@ -1,5 +1,4 @@
 from collections import defaultdict
-from typing import Optional
 
 from mido import Message
 
@@ -16,15 +15,13 @@ class Track(BaseTrack):
             is_recording: bool,
             quantization_delta: float, 
             sequencer_steps: int,
-            starting_measure: int,
             track_number: int,
         ):
         super().__init__(
             clock, 
             instrument, 
             quantization_delta, 
-            sequencer_steps, 
-            starting_measure,
+            sequencer_steps,
             track_number,
         )
         self._is_recording = is_recording
@@ -39,7 +36,7 @@ class Track(BaseTrack):
         self._recorded_notes = notes
 
     def erase_recorded_notes(self) -> None:
-        self._recorded_notes = defaultdict(list)
+        self._recorded_notes.clear()
     
     def handle_midi_message(self, message: Message) -> None:
         """Decide how to handle incoming MIDI notes based on the mode."""
@@ -55,15 +52,13 @@ class Track(BaseTrack):
             # the clock's callback, we can simply check for messages at the delta.
             recorded_time = (message.note % self._sequencer_steps) * self.quantization_delta
             recorded_message = message.copy(time=recorded_time)
-            # print(f'recorded_message = {recorded_message}')
             self.recorded_notes[recorded_time].append(recorded_message)
 
 
     def track_clock_callback(
-            self, 
-            context = ClockContext, 
-            delta=0.0625, 
-            time_unit=TimeUnit.BEATS,
+        self, 
+        context:ClockContext, 
+        delta=float,
     ) -> tuple[float, TimeUnit]:
         """The function that runs on each invocation.
 
@@ -73,16 +68,16 @@ class Track(BaseTrack):
         you can specify SECONDS as the time_unit to have it called outside of a 
         musical rhythmic context.
         """
-        print(f'context.desired_moment.measure={context.desired_moment.measure}')
         recorded_notes_index = delta * (context.event.invocations % self._sequencer_steps )
 
         midi_messages = self.recorded_notes[recorded_notes_index]
         for message in midi_messages:
-            # print(f'Playing message {message}')
             self._instrument.handle_midi_message(message=message)
         
-        delta = self.quantization_delta
-        return delta, time_unit
+        return delta, TimeUnit.BEATS
     
     def start_playback(self) -> None:
-        self._clock_event_id = self._clock.cue(procedure=self.track_clock_callback)
+        self._clock_event_id = self._clock.cue(
+            kwargs={'delta': self.quantization_delta},
+            procedure=self.track_clock_callback
+        )

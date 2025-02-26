@@ -15,7 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 from collections import defaultdict
-from typing import Optional
 
 from mido import Message
 
@@ -38,7 +37,6 @@ class Sequencer(BaseSequencer):
         self._instruments = instruments
         self._midi_handler = self._initialize_midi_handler()
         self._is_recording = False
-        self.previous_measure = 1
         self.playing_tracks: list[Track] = []
         self._tracks: dict[str, list[Track]] = self._initialize_tracks()
         self._selected_instrument = list(self._instruments.values())[0]
@@ -124,11 +122,9 @@ class Sequencer(BaseSequencer):
 
     def add_track(self, instrument_name: str) -> None:
         added_track_number = 0
-        starting_measure = 0
         
         if len(self.tracks[instrument_name]) > 0:
             added_track_number = self.tracks[instrument_name][-1].track_number + 1
-            starting_measure = self._track_length_in_measures * added_track_number
         
         self.tracks[instrument_name].append(
             Track(
@@ -137,7 +133,6 @@ class Sequencer(BaseSequencer):
                 is_recording=self.is_recording,
                 quantization_delta=self.quantization_delta,
                 sequencer_steps=self._SEQUENCER_STEPS,
-                starting_measure=starting_measure,
                 track_number=added_track_number,
             )
         )
@@ -169,7 +164,6 @@ class Sequencer(BaseSequencer):
                     is_recording=self.is_recording,
                     quantization_delta=self.quantization_delta,
                     sequencer_steps=self._SEQUENCER_STEPS,
-                    starting_measure=0,
                     track_number=0,
                 )
             )
@@ -185,39 +179,39 @@ class Sequencer(BaseSequencer):
             # Just play, don't record.
             self.selected_instrument.handle_midi_message(message=message)
         else:
+            # The track will record and then send it to the instrument to play.
             self.selected_track.handle_midi_message(message=message)
     
     def sequencer_clock_callback(
         self, 
-        context=ClockContext, 
-        delta=1.0, # 1 measure 
-        time_unit=TimeUnit.BEATS,
+        context: ClockContext, 
+        delta: float, 
     ) -> tuple[float, TimeUnit]:
-        # print(f'context.event.invocations={context.event.invocations}')
-        # print(f'context.desired_moment.measure={context.desired_moment.measure}')
         if context.event.invocations % self._track_length_in_measures == 0:
-            self.stop_tracks_playback()
-            self.start_tracks_playback(measure=context.event.invocations)
+            index = context.event.invocations // self._track_length_in_measures
+            self.start_tracks_playback(track_index=index)
 
-        return delta, time_unit
+        return delta, TimeUnit.BEATS
 
     def start_playback(self) -> None:
         self._clock.start()
-        self._clock_event_id = self._clock.cue(procedure=self.sequencer_clock_callback)
+        self._clock_event_id = self._clock.cue(
+            kwargs={'delta': 1.0},
+            procedure=self.sequencer_clock_callback
+        )
 
-    def start_tracks_playback(self, measure: int) -> None:
-        # print(f'In start_tracks_playback on measure = {measure}')
-        # if self.playing_tracks:
-        #     self.playing_tracks.clear()
+    def start_tracks_playback(self, track_index: int) -> None:
+        print(f'track_index in start_tracks_playback {track_index}')
+        self.stop_tracks_playback()
+        if self.playing_tracks:
+            self.playing_tracks.clear()
         
         for tracks in self.tracks.values():
-            # if measure < len(tracks):
-            self.playing_tracks.append(tracks[measure])
+            if track_index < len(tracks):
+                self.playing_tracks.append(tracks[track_index])
         
         if not self.playing_tracks:
             self.stop_tracks_playback()
-
-        print(f'{[print(t.recorded_notes) for t in self.playing_tracks]}')
 
         for track in self.playing_tracks:
             track.start_playback()

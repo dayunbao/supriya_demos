@@ -50,7 +50,7 @@ class BaseSequencer(ABC):
         self._clock.change(beats_per_minute=self._bpm)
     
     def _compute_track_length_in_measures(self) -> int:
-        return self._SEQUENCER_STEPS / int(self.quantization.split('/')[1])
+        return self._SEQUENCER_STEPS // int(self.quantization.split('/')[1])
 
     def _convert_quantization_to_delta(self, quantization: str) -> float:
         # This helper function converts a string like '1/16' into a numeric value
@@ -83,5 +83,6 @@ class BaseSequencer(ABC):
 
     def stop_playback(self) -> None:
         """Stop playing track."""
+        self._clock.stop()
         if self._clock_event_id is not None:
             self._clock.cancel(self._clock_event_id)

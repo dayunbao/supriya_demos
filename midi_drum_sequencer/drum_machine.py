@@ -17,13 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 import threading
 from collections import defaultdict
-from concurrent.futures import Future
 from enum import Enum
 
 from mido import get_input_names, Message, open_input
 from mido.ports import MultiPort
 
-from supriya import Server, SynthDef, synthdef
+from supriya import Server, SynthDef
 from supriya.clocks import Clock, ClockContext
 from supriya.clocks.ephemera import TimeUnit
 
@@ -55,9 +54,8 @@ class SequencerMode(Enum):
 
 
 class DrumMachine:
-    def __init__(self, bpm: int, drum_machine_future: Future, quantization: str):
+    def __init__(self, bpm: int, quantization: str):
         self.bpm = bpm
-        self.drum_machine_future = drum_machine_future
         self.clock: Clock = self._init_clock()
         self.clock_event_id: int | None = None
         self.MIDI_CHANNEL_TO_SYNTHDEF: list[SynthDef] = [
@@ -296,4 +294,3 @@ class DrumMachine:
         self.stop_listening_for_input.set()
         self.multiport.close()
         self.server.quit()
-        self.drum_machine_future.set_result(True)

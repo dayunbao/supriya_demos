@@ -25,22 +25,17 @@ from supriya import Envelope, Server, synthdef, Synth
 from supriya.conversions import midi_note_number_to_frequency
 from supriya.ugens import EnvGen, Limiter, LFSaw, Out
 
-multi_inport: MultiPort
-notes: dict[int, Synth] = {}
-server: Server
 
-def open_multi_inport() -> None:
+def open_multi_inport() -> MultiPort:
     """Create a MultiPort that accepts all incoming MIDI messages.
 
     This is the easiest way to handle the fact that people using
     this script could have an input port named anything.
     """
-    global multi_inport
-    
     inports = [mido.open_input(p) for p in mido.get_input_names()]
-    multi_inport = MultiPort(inports)
+    return MultiPort(inports)
 
-def handle_midi_message(message: mido.Message) -> None:
+def handle_midi_message(message: mido.Message, server: Server, notes: dict[int, Synth]) -> None:
     """Deal with a new MIDI message.
 
     This function currently only handles Note On and Note Off 
@@ -49,9 +44,6 @@ def handle_midi_message(message: mido.Message) -> None:
     Args:
         message: a MIDI message.
     """
-    global notes
-    global server
-
     if message.type == 'note_on':
         frequency = midi_note_number_to_frequency(midi_note_number=message.note)
         synth = server.add_synth(synthdef=saw, frequency=frequency)
@@ -62,25 +54,23 @@ def handle_midi_message(message: mido.Message) -> None:
             notes[message.note].set(gate=0)
             del notes[message.note]
 
-def initialize_supriya() -> None:
+def initialize_supriya() -> Server:
     """Initialize the relevant Supriya objects."""
-    global server
-    
     server = Server().boot()
     _ = server.add_synthdefs(saw)
     # Wait for the server to fully load the SynthDef before proceeding.
     server.sync()
 
-def listen_for_midi_messages() -> None:
+    return server
+
+def listen_for_midi_messages(multi_inport: MultiPort, notes: dict[int, Synth], server: Server) -> None:
     """Listen for incoming MIDI messages in a non-blocking way.
     
     mido's iter_pending() is non-blocking.
     """
-    global multi_inport
-
     while True:
         for message in multi_inport.iter_pending():
-            handle_midi_message(message=message)
+            handle_midi_message(message=message, notes=notes, server=server)
 
 @synthdef()
 def saw(frequency=440.0, amplitude=0.5, gate=1) -> None:
@@ -111,6 +101,7 @@ def saw(frequency=440.0, amplitude=0.5, gate=1) -> None:
     Out.ar(bus=0, source=signal)
 
 if __name__ == '__main__':
-    initialize_supriya()
-    open_multi_inport()
-    listen_for_midi_messages()
+    server = initialize_supriya()
+    multi_inport = open_multi_inport()
+    notes: dict[int, Synth] = {}
+    listen_for_midi_messages(multi_inport=multi_inport, notes=notes, server=server)

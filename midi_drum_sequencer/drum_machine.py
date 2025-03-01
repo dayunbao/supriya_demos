@@ -15,6 +15,8 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License 
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
+
+import fractions
 import threading
 from collections import defaultdict
 from enum import Enum
@@ -23,8 +25,7 @@ from mido import get_input_names, Message, open_input
 from mido.ports import MultiPort
 
 from supriya import Server, SynthDef
-from supriya.clocks import Clock, ClockContext
-from supriya.clocks.ephemera import TimeUnit
+from supriya.clocks import Clock, ClockContext, TimeUnit
 
 from synth_defs import (
     bass_drum,
@@ -77,7 +78,7 @@ class DrumMachine:
             closed_high_hat,
         ]
         self.multiport = self._open_multiport()
-        self.quantization_delta = self.clock.quantization_to_beats(quantization=quantization)
+        self.quantization_delta = self._quantization_to_beats(quantization=quantization)
         self.recorded_notes: dict[float, list[Message]] = defaultdict(list)
         self.sequencer_mode: Enum = SequencerMode.PERFORM
         self.SEQUENCER_STEPS: int = 16
@@ -249,6 +250,13 @@ class DrumMachine:
             recorded_time = (message.note % self.SEQUENCER_STEPS) * self.quantization_delta
             recorded_message = message.copy(time=recorded_time)
             self.recorded_notes[recorded_time].append(recorded_message)
+
+    def _quantization_to_beats(self, quantization: str) -> float:
+        fraction = fractions.Fraction(quantization.replace("T", ""))
+        if "T" in quantization:
+            fraction *= fractions.Fraction(2, 3)
+        
+        return float(fraction)
 
     def run(self) -> None:
         """Start the drum machine and sequencer."""

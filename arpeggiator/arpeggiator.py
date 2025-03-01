@@ -22,6 +22,7 @@ from typing import Union
 import click
 
 from supriya import Envelope, Server, synthdef
+from supriya.clocks import Clock
 from supriya.conversions import midi_note_number_to_frequency
 from supriya.patterns import EventPattern, PatternPlayer, SequencePattern
 from supriya.ugens import EnvGen, Limiter, LFSaw, Out
@@ -148,7 +149,8 @@ def start(chord: str, direction: str) -> None:
     arpeggiator_sequence = create_sequence(chord_data=chord_data, direction=arp_direction)
     arpeggiator_pattern = create_arpeggiator(arpeggiator_sequence=arpeggiator_sequence)
     server = initialize()
-    play_arpeggiator(arpeggiator_pattern=arpeggiator_pattern, server=server)
+    clock = Clock()
+    play_arpeggiator(arpeggiator_pattern=arpeggiator_pattern, clock=clock, server=server)
 
     while True:
         continue
@@ -232,9 +234,9 @@ def initialize() -> Server:
 
     return server
 
-def play_arpeggiator(arpeggiator_pattern: EventPattern, server: Server) -> PatternPlayer:
+def play_arpeggiator(arpeggiator_pattern: EventPattern, clock: Clock, server: Server) -> PatternPlayer:
     """Create a PatternPlayer, and play it."""
-    return arpeggiator_pattern.play(context=server)
+    return arpeggiator_pattern.play(clock=clock, context=server)
 
 @synthdef()
 def saw(frequency=440.0, amplitude=0.5, gate=1) -> None:

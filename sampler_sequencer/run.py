@@ -10,11 +10,12 @@ from consolemenu.validators.base import BaseValidator
 from supriya import Server
 from supriya.clocks.bases import Quantization
 
+from .reverb import Reverb
 from .sampler import Sampler
 from .sequencer import Sequencer
 from .sp_303 import SP303
 
-from .synth_defs import sample_player #  , sp_303
+from .synth_defs import reverb, sample_player #  , sp_303
 
 
 class BPMValidator(BaseValidator):
@@ -84,6 +85,20 @@ def add_track(sequencer: Sequencer) -> None:
             return
     except UserQuit:
         return
+
+def create_effects(server: Server) -> Reverb:
+    reverb_effect = Reverb(
+        server=server,
+        synth_def=reverb,
+        parameters={
+            'in_bus': 2,
+            'mix': 0.33,
+            'room_size': 0.5,
+            'out_bus': 0,
+        }
+    )
+
+    return reverb_effect
 
 def create_menu(sequencer: Sequencer) -> ConsoleMenu:
     main_menu = ConsoleMenu(
@@ -449,11 +464,14 @@ def initialize_instruments(server: Server) -> Sampler:
     return sampler
 
 def initialize_sequencer(server: Server, bpm: int, quantization: str) -> Sequencer:
+    reverb = create_effects(server=server)
     sampler = initialize_instruments(server=server)
     sequencer = Sequencer(
         bpm=bpm, 
+        effects=[reverb],
         instruments={sampler.name: sampler}, #  , supriya_303.name: supriya_303},
         quantization=quantization,
+        server=server,
     )
 
     return sequencer

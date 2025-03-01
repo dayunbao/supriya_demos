@@ -2,22 +2,35 @@ from pathlib import Path
 
 from mido import Message
 
-from supriya import Buffer, Server, SynthDef
+from supriya import Buffer, Group, Server, SynthDef
 
 from class_lib import BaseInstrument
 
 class Sampler(BaseInstrument):
     def __init__(
             self, 
+            midi_channels: list[int],
             server: Server, 
             synth_definition: SynthDef,
-            midi_channels: list[int],
         ):
-        super().__init__(server, synth_definition, midi_channels)
+        super().__init__(
+            midi_channels,
+            server, 
+            synth_definition, 
+        )
+        self._group: Group | None = None
         self._drum_samples_path: Path = Path(__file__).parent / 'samples/roland_tr_909'
         self._drum_buffers = self._load_buffers()
         self._load_synthdefs()
         self._name = 'Sampler'
+
+    @property
+    def group(self) -> Group:
+        return self._group
+    
+    @group.setter
+    def group(self, group: Group) -> None:
+        self._group = group
 
     @property
     def name(self) -> str:
@@ -68,7 +81,8 @@ class Sampler(BaseInstrument):
         """
         if message.channel in self._midi_channels:
             drum_buff = self._drum_buffers[message.channel]
-            self._server.add_synth(
+            self.group.add_synth(
                 synthdef=self._synth_definition, 
                 drum_buff=drum_buff,
+                out_bus=self.out_bus,
             )

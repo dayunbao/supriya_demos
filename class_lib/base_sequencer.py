@@ -24,7 +24,7 @@ from .midi_handler import MIDIHandler
 class BaseSequencer(ABC):
     def __init__(
             self, 
-            bpm: int, 
+            bpm: int,
             quantization: str,
     ):
         self._bpm: int = bpm

@@ -24,7 +24,7 @@ from typing import get_args
 
 import click
 
-from supriya.clocks.bases import Quantization
+from supriya.clocks import Quantization
 
 from drum_machine import DrumMachine
 

@@ -25,7 +25,7 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
-
+import fractions
 import re
 import sys
 from concurrent.futures import Future
@@ -34,9 +34,7 @@ from typing import get_args
 import click
 
 from supriya import Envelope, Server, synthdef
-from supriya.clocks import Clock, ClockContext
-from supriya.clocks.bases import Quantization
-from supriya.clocks.ephemera import TimeUnit
+from supriya.clocks import Clock, ClockContext, Quantization, TimeUnit
 from supriya.conversions import midi_note_number_to_frequency
 from supriya.ugens import EnvGen, Limiter, LFSaw, Out
 
@@ -226,7 +224,7 @@ def start(bpm: int, quantization: str, chord: str, direction: str, repetitions: 
     notes = create_notes(chord_data=chord_data, direction=arp_direction)
     server = initialize_server()
     clock = initialize_clock(bpm=bpm)
-    quantization_delta = clock.quantization_to_beats(quantization=quantization)
+    quantization_delta = quantization_to_beats(quantization=quantization)
     future: Future = Future()
     clock_event_id = start_arpeggiator(
         clock=clock, 
@@ -286,6 +284,13 @@ def initialize_clock(bpm: int) -> Clock:
     clock.start()
 
     return clock
+
+def quantization_to_beats(quantization: str) -> float:
+    fraction = fractions.Fraction(quantization.replace("T", ""))
+    if "T" in quantization:
+        fraction *= fractions.Fraction(2, 3)
+    
+    return float(fraction)
 
 @synthdef()
 def saw(frequency=440.0, amplitude=0.5) -> None:

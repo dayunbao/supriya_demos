@@ -93,7 +93,7 @@ class Track(BaseTrack):
     def _load_synthdef(self) -> None:
         self.server.add_synthdefs(audio_to_disk)
 
-    def start_playback(self) -> None:        
+    def start_playback(self) -> None:
         self.start_recording_to_disk()
 
         self._clock_event_id = self._clock.cue(

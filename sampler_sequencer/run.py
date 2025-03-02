@@ -64,8 +64,8 @@ class TrackNumberValidator(BaseValidator):
         return result
 
 
-def add_track(sequencer: Sequencer) -> None:
-    prompt_util = PromptUtils()
+def add_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
+    prompt_util = PromptUtils(screen=menu.screen)
     instrument_names = [name for name in sequencer.instruments.keys()]
     track_add_validator = InstrumentNameValidator(instruments=instrument_names)
 
@@ -166,21 +166,21 @@ def create_menu(sequencer: Sequencer) -> ConsoleMenu:
     record_change_instrument_menu_item = FunctionItem(
         text='Change instrument',
         function=change_instrument,
-        kwargs={'sequencer': sequencer},
+        kwargs={'menu': record_menu, 'sequencer': sequencer},
         menu=record_menu,
     )
 
     record_change_track_menu_item = FunctionItem(
         text='Change track',
         function=change_track,
-        kwargs={'sequencer': sequencer},
+        kwargs={'menu': record_menu, 'sequencer': sequencer},
         menu=record_menu,
     )
 
     record_change_both_menu_item = FunctionItem(
         text='Change instrument and track',
         function=change_both,
-        kwargs={'sequencer': sequencer},
+        kwargs={'menu': record_menu, 'sequencer': sequencer},
         menu=record_menu,
     )
 
@@ -221,12 +221,12 @@ def create_menu(sequencer: Sequencer) -> ConsoleMenu:
     sequencer_change_bpm_menu_item = FunctionItem(
         text='Change BPM',
         function=get_bpm_input,
-        kwargs={'sequencer', sequencer}
+        kwargs={'menu': sequencer_menu, 'sequencer': sequencer}
     )
     sequencer_change_quantization_menu_item = FunctionItem(
         text='Change quantization',
         function=get_quantization_input,
-        kwargs={'sequencer': sequencer},
+        kwargs={'menu': sequencer_menu, 'sequencer': sequencer},
     )
 
     sequencer_menu.append_item(sequencer_change_bpm_menu_item)
@@ -253,12 +253,12 @@ def create_menu(sequencer: Sequencer) -> ConsoleMenu:
     tracks_add_menu_item = FunctionItem(
         text='Add track', 
         function=add_track,
-        kwargs={'sequencer': sequencer},
+        kwargs={'menu': tracks_menu, 'sequencer': sequencer},
     )
     track_delete_menu_item = FunctionItem(
         text='Delete', 
         function=delete_track,
-        kwargs={'sequencer': sequencer},
+        kwargs={'menu': tracks_menu, 'sequencer': sequencer},
     )
 
     tracks_menu.append_item(tracks_add_menu_item)
@@ -291,8 +291,8 @@ def change_both(sequencer: Sequencer) -> None:
     change_instrument(sequencer=sequencer)
     change_track(sequencer=sequencer)
 
-def change_instrument(sequencer: Sequencer) -> None:
-    prompt_util = PromptUtils()
+def change_instrument(menu: ConsoleMenu, sequencer: Sequencer) -> None:
+    prompt_util = PromptUtils(screen=menu.screen)
     instrument_names = [name for name in sequencer.instruments.keys()]
     instrument_name_validator = InstrumentNameValidator(instruments=instrument_names)
 
@@ -313,8 +313,8 @@ def change_instrument(sequencer: Sequencer) -> None:
     except UserQuit:
         return
 
-def change_track(sequencer: Sequencer) -> None:
-    prompt_util = PromptUtils()
+def change_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
+    prompt_util = PromptUtils(screen=menu.screen)
     selected_instrument = sequencer.selected_instrument.name
     num_tracks = len(sequencer.tracks[selected_instrument])
     track_number_validator = TrackNumberValidator(number_of_tracks=num_tracks)
@@ -342,8 +342,8 @@ def change_track(sequencer: Sequencer) -> None:
     except UserQuit:
         return
 
-def delete_track(sequencer: Sequencer) -> None:
-    prompt_util = PromptUtils()
+def delete_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
+    prompt_util = PromptUtils(screen=menu.screen)
 
     instrument_names = [name for name in sequencer.instruments.keys()]
     track_add_validator = InstrumentNameValidator(instruments=instrument_names)
@@ -397,8 +397,8 @@ def exit_program(sequencer: Sequencer, server: Server) -> None:
     # and doesn't linger after the program exits.
     exit(0)
 
-def get_bpm_input(sequencer: Sequencer) -> None:
-    prompt_util = PromptUtils()
+def get_bpm_input(menu: ConsoleMenu, sequencer: Sequencer) -> None:
+    prompt_util = PromptUtils(screen=menu.screen)
     bpm_validator = BPMValidator()
     
     try:
@@ -428,8 +428,8 @@ def get_current_number_of_tracks(sequencer: Sequencer) -> str:
 def get_current_sequencer_settings(sequencer: Sequencer) -> str:
     return f'Current settings:\nBeats per minute(BPM) = {sequencer.bpm} * Quantization = {sequencer.quantization}'
 
-def get_quantization_input(sequencer: Sequencer) -> None:
-    prompt_util = PromptUtils()
+def get_quantization_input(menu: ConsoleMenu, sequencer: Sequencer) -> None:
+    prompt_util = PromptUtils(screen=menu.screen)
     quantization_validator = QuantizationValidator()
     valid_quantizations = ', '.join([q for q in get_args(Quantization)])
     

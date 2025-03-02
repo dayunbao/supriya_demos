@@ -30,7 +30,7 @@ class Track(BaseTrack):
             track_number,
         )
         self.group = group
-        self._is_recording = is_recording
+        self.is_recording = is_recording
         self.recording_bus = recording_bus
         self._recorded_notes: dict[float, list[Message]] = defaultdict(list)
         self.server = server

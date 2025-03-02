@@ -151,6 +151,7 @@ class Sequencer(BaseSequencer):
                 instrument=self.instruments[instrument_name],
                 is_recording=self.is_recording,
                 quantization_delta=self.quantization_delta,
+                recording_bus=self.effects[-1].out_bus,
                 sequencer_steps=self._SEQUENCER_STEPS,
                 server=self.server,
                 track_number=added_track_number,

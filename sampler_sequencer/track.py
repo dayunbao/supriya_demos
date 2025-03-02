@@ -4,8 +4,7 @@ from pathlib import Path
 from mido import Message
 
 from supriya import Buffer, Bus, Group, Server, Synth
-from supriya.clocks import Clock, ClockContext
-from supriya.clocks.ephemera import TimeUnit
+from supriya.clocks import Clock, ClockContext, TimeUnit
 
 from class_lib import BaseTrack, BaseInstrument
 from .synth_defs import audio_to_disk
@@ -95,30 +94,28 @@ class Track(BaseTrack):
         self.server.add_synthdefs(audio_to_disk)
 
     def start_playback(self) -> None:        
+        self.start_recording_to_disk()
+
         self._clock_event_id = self._clock.cue(
             kwargs={'delta': self.quantization_delta},
             procedure=self.track_clock_callback
         )
-
-        self.start_recording_to_disk()
     
     def start_recording_to_disk(self) -> None:
         self.recording_buffer = self._create_buffer()
-        self.start_writing_buffer()
+        self.recording_buffer.write(
+            file_path=self.buffer_file_path,
+            frame_count=0,
+            header_format='WAV',
+            leave_open=True,
+        )
 
-    def start_writing_audio_to_disk(self) -> None:
+        self.server.sync()
+
         self.audio_to_disk_synth = self.group.add_synth(
             synthdef=audio_to_disk,
             buffer_number=self.recording_buffer.id_,
             in_bus=self.recording_bus,
-        )
-
-    def start_writing_buffer(self) -> None:
-        self.recording_buffer.write(
-            file_path=self.buffer_file_path,
-            header_format='WAV',
-            leave_open=True,
-            on_completion=lambda _: self.start_writing_audio_to_disk()
         )
 
     def stop_playback(self) -> None:
@@ -127,9 +124,8 @@ class Track(BaseTrack):
 
     def stop_recording_to_disk(self) -> None:
         self.audio_to_disk_synth.free()
-        # self.recording_buffer.close()
-        # self.recording_buffer.free()
         self.recording_buffer.close(on_completion=lambda _: self.recording_buffer.free())
+        self.server.sync()
 
     def track_clock_callback(
         self, 

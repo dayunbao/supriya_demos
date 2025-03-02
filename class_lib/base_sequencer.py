@@ -14,10 +14,10 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License 
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
+import fractions
 from abc import ABC, abstractmethod
 
-from supriya.clocks import Clock, ClockContext
-from supriya.clocks.ephemera import TimeUnit
+from supriya.clocks import Clock, ClockContext, TimeUnit
 
 from .midi_handler import MIDIHandler
 
@@ -31,7 +31,7 @@ class BaseSequencer(ABC):
         self._clock = self._initialize_clock()
         self._clock_event_id: int | None = None
         self._quantization = quantization
-        self._quantization_delta = self._convert_quantization_to_delta(quantization=quantization)
+        self._quantization_delta = self._quantization_to_beats(quantization=quantization)
         self._SEQUENCER_STEPS: int = 16
         self._track_length_in_measures = self._compute_track_length_in_measures()
 
@@ -52,11 +52,6 @@ class BaseSequencer(ABC):
     def _compute_track_length_in_measures(self) -> int:
         return self._SEQUENCER_STEPS // int(self.quantization.split('/')[1])
 
-    def _convert_quantization_to_delta(self, quantization: str) -> float:
-        # This helper function converts a string like '1/16' into a numeric value
-        # used by the clock.
-        return self._clock.quantization_to_beats(quantization=quantization)
-
     def exit(self) -> None:        
         self.midi_handler.exit()
 
@@ -74,6 +69,15 @@ class BaseSequencer(ABC):
             delta: float,
     ) -> tuple[float, TimeUnit]:
         pass
+
+    def _quantization_to_beats(self, quantization: str) -> float:
+        # This helper function converts a string like '1/16' into a numeric value
+        # used by the clock.
+        fraction = fractions.Fraction(quantization.replace("T", ""))
+        if "T" in quantization:
+            fraction *= fractions.Fraction(2, 3)
+        
+        return float(fraction)
 
     @abstractmethod
     def start_playback(self) -> None:

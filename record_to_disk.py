@@ -1,3 +1,4 @@
+import sys
 import time
 from pathlib import Path
 
@@ -25,7 +26,7 @@ def saw(frequency=440.0, amplitude=0.5, gate=1, out_bus=0):
 def create_buffer(server: Server) -> Buffer:
     buffer = server.add_buffer(
         channel_count=2,
-        frame_count=262144,
+        frame_count=65536,
     )
 
     server.sync()
@@ -43,22 +44,25 @@ def create_buffer_file_path() -> Path:
         file_path.touch()
     
     return file_path
+    
 
 def main() -> None:
     server = Server().boot()
     server.add_synthdefs(audio_to_disk, saw)
     server.sync()
-    saw_synth = start_playing_synth(server=server)
     file_path = create_buffer_file_path()
     recording_buffer = create_buffer(server=server)
-    start_writing_buffer(recording_buffer=recording_buffer, file_path=file_path)
+    start_writing_buffer(recording_buffer=recording_buffer, file_path=file_path, server=server)
     audio_to_disk_synth = start_writing_audio_to_disk(server=server, recording_buffer=recording_buffer)
-    print(server.dump_tree())
+    saw_synth = start_playing_synth(server=server)
     time.sleep(5)
     audio_to_disk_synth.free()
     saw_synth.set(gate=0)
     saw_synth.free()
     recording_buffer.close(on_completion=lambda _: recording_buffer.free())
+    server.sync()
+    sys.exit(0)
+
 
 def start_playing_synth(server: Server) -> Synth:
     saw_synth: Synth = server.add_synth(
@@ -78,12 +82,15 @@ def start_writing_audio_to_disk(server: Server, recording_buffer: Buffer) -> Syn
 
     return audio_to_disk_synth
 
-def start_writing_buffer(recording_buffer: Buffer, file_path: Path) -> None:
+def start_writing_buffer(recording_buffer: Buffer, file_path: Path, server: Server) -> None:
     recording_buffer.write(
         file_path=file_path,
         header_format='WAV',
         leave_open=True,
+        frame_count=0,
     )
+
+    server.sync()
 
 
 if __name__ == '__main__':

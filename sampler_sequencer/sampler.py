@@ -86,3 +86,5 @@ class Sampler(BaseInstrument):
                 drum_buff=drum_buff,
                 out_bus=self.out_bus,
             )
+
+            print(self._server.dump_tree())

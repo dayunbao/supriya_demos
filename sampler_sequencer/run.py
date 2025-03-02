@@ -8,7 +8,7 @@ from consolemenu.prompt_utils import PromptUtils, UserQuit
 from consolemenu.validators.base import BaseValidator
 
 from supriya import Server
-from supriya.clocks.bases import Quantization
+from supriya.clocks import Quantization
 
 from .reverb import Reverb
 from .sampler import Sampler

@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 
-from supriya.clocks import Clock, ClockContext
-from supriya.clocks.ephemera import TimeUnit
+from supriya.clocks import Clock, ClockContext, TimeUnit
 
 from .base_instrument import BaseInstrument
 

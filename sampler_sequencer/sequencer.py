@@ -19,8 +19,7 @@ from collections import defaultdict
 from mido import Message
 
 from supriya import AddAction, Server
-from supriya.clocks import ClockContext
-from supriya.clocks.ephemera import TimeUnit
+from supriya.clocks import ClockContext, TimeUnit
 
 from class_lib import BaseEffect
 from class_lib import MIDIHandler

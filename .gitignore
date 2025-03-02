@@ -172,5 +172,3 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-
-sampler_sequencer/track_recordings/*

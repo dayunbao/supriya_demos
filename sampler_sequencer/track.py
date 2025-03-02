@@ -60,11 +60,15 @@ class Track(BaseTrack):
         return buffer
 
     def _create_buffer_file_path(self) -> Path:
-        dir_path = Path(__file__).parent / f'track_recordings/{self._instrument.name}'
-        if not dir_path.exists():
-            dir_path.mkdir()
+        track_recordings_dir_path = Path(__file__).parent / 'track_recordings'
+        if not track_recordings_dir_path.exists():
+            track_recordings_dir_path.mkdir()
+        
+        instrument_dir_path = Path(__file__).parent / track_recordings_dir_path / self._instrument.name
+        if not instrument_dir_path.exists():
+            instrument_dir_path.mkdir()
 
-        file_path =  dir_path / f'track_{self.track_number}.wav'
+        file_path =  instrument_dir_path / f'track_{self.track_number}.wav'
         
         if not file_path.exists():
             file_path.touch()

@@ -18,10 +18,9 @@ from collections import defaultdict
 
 from mido import Message
 
-from supriya import AddAction, Server
+from supriya import Server
 from supriya.clocks import ClockContext, TimeUnit
 
-from class_lib import BaseEffect
 from class_lib import MIDIHandler
 from class_lib import BaseSequencer
 from class_lib import BaseInstrument
@@ -31,32 +30,19 @@ class Sequencer(BaseSequencer):
     def __init__(
             self, 
             bpm: int, 
-            effects: list[BaseEffect],
             instruments: dict[str, BaseInstrument],
             quantization: str,
             server: Server,
     ):
         super().__init__(bpm, quantization)
         self._instruments = instruments
-        self.effects = effects
-        self._route_effects_signals()
-        self._route_instruments_signals()
         self._midi_handler = self._initialize_midi_handler()
         self._is_recording = False
         self.playing_tracks: list[Track] = []
         self.server = server
-        
-        # Need these here
-        self.instruments_group = self.server.add_group()
-        self.effects_group = self.instruments_group.add_group(add_action=AddAction.ADD_AFTER)
-        self.tracks_group = self.effects_group.add_group(add_action=AddAction.ADD_AFTER)
-        
         self._tracks: dict[str, list[Track]] = self._initialize_tracks()
         self._selected_instrument = list(self._instruments.values())[0]
         self._selected_track = self._tracks[self._selected_instrument.name][0]        
-        self._add_effects_to_group()
-        self._add_instruments_to_group()
-        self._create_effects_synths()
 
     @property
     def instruments(self) -> dict[str, BaseInstrument]:
@@ -130,14 +116,6 @@ class Sequencer(BaseSequencer):
     def tracks(self, tracks: dict[str, list[Track]]) -> None:
         self._tracks = tracks
 
-    def _add_effects_to_group(self) -> None:
-        for effect in self.effects:
-            effect.group = self.effects_group
-    
-    def _add_instruments_to_group(self) -> None:
-        for instrument in self.instruments.values():
-            instrument.group = self.instruments_group
-
     def add_track(self, instrument_name: str) -> None:
         added_track_number = 0
         
@@ -147,20 +125,14 @@ class Sequencer(BaseSequencer):
         self.tracks[instrument_name].append(
             Track(
                 clock=self._clock,
-                group=self.tracks_group,
                 instrument=self.instruments[instrument_name],
                 is_recording=self.is_recording,
                 quantization_delta=self.quantization_delta,
-                recording_bus=self.effects[-1].out_bus,
                 sequencer_steps=self._SEQUENCER_STEPS,
                 server=self.server,
                 track_number=added_track_number,
             )
         )
-
-    def _create_effects_synths(self) -> None:
-        for effect in self.effects:
-            effect.create_synth()
 
     def delete_track(self, instrument_name: str, track_number: int) -> None:
         removed_track_number = self.tracks[instrument_name][track_number].track_number
@@ -197,11 +169,9 @@ class Sequencer(BaseSequencer):
             tracks_by_instrument[instrument.name].append(
                 Track(
                     clock=self._clock,
-                    group=self.tracks_group,
                     instrument=instrument,
                     is_recording=self.is_recording,
                     quantization_delta=self.quantization_delta,
-                    recording_bus=self.effects[-1].out_bus,
                     sequencer_steps=self._SEQUENCER_STEPS,
                     server=self.server,
                     track_number=0,
@@ -209,15 +179,6 @@ class Sequencer(BaseSequencer):
             )
         
         return tracks_by_instrument
-    
-    def _route_effects_signals(self) -> None:
-        for index, effect in enumerate(self.effects):
-            if index + 1 < len(self.effects) - 1:
-                effect.out_bus = self.effects[index + 1].in_bus
-
-    def _route_instruments_signals(self) -> None:
-        for instrument in self.instruments.values():
-            instrument.out_bus = self.effects[0].in_bus
 
     def sequencer_clock_callback(
         self, 

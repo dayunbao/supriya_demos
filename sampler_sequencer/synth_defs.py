@@ -42,7 +42,7 @@ def reverb(
 def sample_player(drum_buff, out_bus):
     signal = PlayBuf.ar(buffer_id=drum_buff, channel_count=1, done_action=2)
     signal = Pan2.ar(source=signal, position=0.0, level=1.0)
-    signal = Limiter.ar(duration=0.01, level=0.5, source=signal)
+    signal = Limiter.ar(duration=0.01, level=0.15, source=signal)
     Out.ar(bus=out_bus, source=signal)
 
 # @synthdef()

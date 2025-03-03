@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 from abc import ABC, abstractmethod
+from typing import Optional
 
 from supriya import Bus, Group, Server, Synth, SynthDef
 
@@ -23,18 +24,20 @@ from .base_instrument import BaseInstrument
 class BaseEffect(ABC):
     def __init__(
         self,
+        name: str,
         server: Server,
         synth_def: SynthDef, 
-        parameters: dict[str, any]
+        group: Optional[Group | None]=None,
+        out_bus: int | Bus=0,
     ):
-        self.group: Group | None = None
+        self.group = group
+        self.name = name
         self.server = server
         self.synth_def = synth_def
-        self.parameters = parameters
-        self.bus = self._create_bus()
+        self.bus = self.server.add_bus(calculation_rate='audio')
         self.in_bus = self.bus
         #  Default to standard out
-        self.out_bus = 0
+        self._out_bus = out_bus
         #  Where in the signal processing chain the effect should be.
         self.priority = 0
         self._load_synth_def()
@@ -46,16 +49,18 @@ class BaseEffect(ABC):
     @group.setter
     def group(self, group: Group) -> None:
         self._group = group
+    
+    @property
+    def out_bus(self) -> int | Bus:
+        self._out_bus
+    
+    @out_bus.setter
+    def out_bus(self, out_bus: int | Bus) -> None:
+        self._out_bus = out_bus
 
-    def _create_bus(self) -> Bus:
-        return self.server.add_bus(calculation_rate='audio')
-
-    def create_synth(self) -> Synth:
-        self.group.add_synth(
-            in_bus = self.in_bus,
-            out_bus=self.out_bus,
-            synthdef=self.synth_def
-        )
+    @abstractmethod
+    def get_parameters(self) -> dict[str, any]:
+        pass
 
     def _load_synth_def(self) -> None:
         self.server.add_synthdefs(self.synth_def)

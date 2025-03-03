@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 
 from mido import Message
 
@@ -12,25 +13,18 @@ class Sampler(BaseInstrument):
             midi_channels: list[int],
             server: Server, 
             synth_definition: SynthDef,
+            group: Optional[Group | None]=None,
         ):
         super().__init__(
             midi_channels,
             server, 
             synth_definition, 
+            group=group,
         )
-        self._group: Group | None = None
         self._drum_samples_path: Path = Path(__file__).parent / 'samples/roland_tr_909'
         self._drum_buffers = self._load_buffers()
         self._load_synthdefs()
-        self._name = 'Sampler'
-
-    @property
-    def group(self) -> Group:
-        return self._group
-    
-    @group.setter
-    def group(self, group: Group) -> None:
-        self._group = group
+        self._name = 'sampler'
 
     @property
     def name(self) -> str:
@@ -86,3 +80,5 @@ class Sampler(BaseInstrument):
                 drum_buff=drum_buff,
                 out_bus=self.out_bus,
             )
+
+        print(self._server.dump_tree())

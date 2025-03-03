@@ -13,9 +13,9 @@ from supriya.clocks import Quantization
 from .reverb import Reverb
 from .sampler import Sampler
 from .sequencer import Sequencer
-from .sp_303 import SP303
+from .supriya_studio import SupriyaStudio
 
-from .synth_defs import reverb, sample_player #  , sp_303
+from .synth_defs import reverb, sample_player
 
 
 class BPMValidator(BaseValidator):
@@ -63,7 +63,6 @@ class TrackNumberValidator(BaseValidator):
 
         return result
 
-
 def add_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
     prompt_util = PromptUtils(screen=menu.screen)
     instrument_names = [name for name in sequencer.instruments.keys()]
@@ -86,21 +85,7 @@ def add_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
     except UserQuit:
         return
 
-def create_effects(server: Server) -> Reverb:
-    reverb_effect = Reverb(
-        server=server,
-        synth_def=reverb,
-        parameters={
-            'in_bus': 2,
-            'mix': 0.33,
-            'room_size': 0.5,
-            'out_bus': 0,
-        }
-    )
-
-    return reverb_effect
-
-def create_menu(sequencer: Sequencer) -> ConsoleMenu:
+def create_menu(sequencer: Sequencer, supriya_studio: SupriyaStudio) -> ConsoleMenu:
     main_menu = ConsoleMenu(
         title='Sampler Sequencer', 
         subtitle='Choose an option',
@@ -133,12 +118,12 @@ def create_menu(sequencer: Sequencer) -> ConsoleMenu:
     )
     playback_start_menu_item = FunctionItem(
         text='Start', 
-        function=sequencer.start_playback, 
+        function=supriya_studio.start_playback, 
         menu=playback_menu,
     )
     playback_stop_menu_item = FunctionItem(
         text='Stop', 
-        function=sequencer.stop_playback,
+        function=supriya_studio.stop_playback,
         menu=playback_menu
     )
 
@@ -448,6 +433,23 @@ def get_quantization_input(menu: ConsoleMenu, sequencer: Sequencer) -> None:
     except UserQuit:
         return
 
+# Remove me
+def initialize_effects(server: Server) -> Reverb:
+    reverb_effect = Reverb(
+        name='reverb',
+        server=server,
+        synth_def=reverb,
+        parameters={
+            'in_bus': 2,
+            'mix': 0.33,
+            'room_size': 0.5,
+            'out_bus': 0,
+        }
+    )
+
+    return reverb_effect
+
+# Remove me
 def initialize_instruments(server: Server) -> Sampler:
     sampler = Sampler(
         midi_channels=[x for x in range(16)],
@@ -463,8 +465,9 @@ def initialize_instruments(server: Server) -> Sampler:
 
     return sampler
 
+# Remove me
 def initialize_sequencer(server: Server, bpm: int, quantization: str) -> Sequencer:
-    reverb = create_effects(server=server)
+    reverb = initialize_effects(server=server)
     sampler = initialize_instruments(server=server)
     sequencer = Sequencer(
         bpm=bpm, 
@@ -477,11 +480,11 @@ def initialize_sequencer(server: Server, bpm: int, quantization: str) -> Sequenc
     return sequencer
 
 def start() -> None:
-    server = Server().boot()
-    sequencer = initialize_sequencer(server=server, bpm=120, quantization='1/8')
-    main_menu = create_menu(sequencer=sequencer)
+    supriya_studio = SupriyaStudio()
+
+    main_menu = create_menu(sequencer=supriya_studio.sequencer, supriya_studio=supriya_studio)
     main_menu.show()
-    exit_program(sequencer=sequencer, server=server)
+    exit_program(sequencer=supriya_studio.sequencer, server=supriya_studio.server)
 
 if __name__ == '__main__':
     start()

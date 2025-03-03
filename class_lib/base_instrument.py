@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
 from abc import ABC, abstractmethod
+from typing import Optional
 
 from mido import Message
 
@@ -24,18 +25,28 @@ from supriya import Group, Server, SynthDef
 
 class BaseInstrument(ABC):
     def __init__(
-        self, 
+        self,
         midi_channels: list[int],
         server: Server, 
         synth_definition: SynthDef,
+        group: Optional[Group | None]=None,
     ):
+        self.group = group
         self.in_bus = 2
         self.out_bus = 0
         self._server = server
         self._synth_definition = synth_definition
         self._midi_channels = midi_channels
         self._synths = {}
+
+    @property
+    def group(self) -> Group:
+        return self._group
     
+    @group.setter
+    def group(self, group: Group) -> None:
+        self._group = group
+
     @property
     @abstractmethod
     def name(self):

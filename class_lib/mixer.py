@@ -34,6 +34,9 @@ class Mixer:
         self._add_synthdefs()
         
         self.main_audio_out_bus: Bus = self.server.add_bus(calculation_rate='audio')
+        print()
+        print(f'self.main_audio_out_bus={self.main_audio_out_bus}')
+        print()
         self.effects_chain_bus: Bus = self.server.add_bus(calculation_rate='audio')
 
         # Holds all of the other groups
@@ -53,6 +56,7 @@ class Mixer:
         # This needs to be at the very end as all audio eventually makes its way here.
         self.main_audio_group = self.mixer_group.add_group(add_action=AddAction.ADD_TO_TAIL)
         self.main_audio_output_synth = self.main_audio_group.add_synth(
+            amplitude=0.001,
             synthdef=main_audio_output, 
             in_bus=self.main_audio_out_bus,
         )

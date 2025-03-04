@@ -59,9 +59,10 @@ class Channel:
     def create_synths(self) -> None:
         self.gain_synth = self.group.add_synth(
             synthdef=gain, 
-            amplitude=1.0,
+            amplitude=0.01,
             in_bus=self.in_bus,
-            out_bus = self.eq_bus
+            out_bus = self.eq_bus,
+            add_action=AddAction.ADD_TO_TAIL,
         )
         
         self.eq_synth = self.group.add_synth(
@@ -71,13 +72,15 @@ class Channel:
             resonance=1.0,
             in_bus = self.eq_bus,
             out_bus = self.pan_bus,
+            add_action=AddAction.ADD_TO_TAIL,
         )
 
         self.pan_synth = self.group.add_synth(
             synthdef=pan,
             in_bus = self.pan_bus,
             out_bus = self.out_bus,
-            pan_position=0.0,
+            pan_position=-1.0,
+            add_action=AddAction.ADD_TO_TAIL,
         )
     
     # RECORDING

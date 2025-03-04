@@ -193,6 +193,8 @@ class Sequencer(BaseSequencer):
 
     def set_selected_instrument_by_name(self, name: str) -> None:
         self.selected_instrument = self.instruments[name]
+        # Also need to set the selected track
+        self.selected_track = self.tracks[self.selected_instrument.name][0]
 
     def set_selected_track_by_track_number(self, instrument_name: str, track_number: int) -> None:
         self.selected_track = self.tracks[instrument_name][track_number]

@@ -14,10 +14,12 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License 
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
-from class_lib import BaseEffect, BaseInstrument, Mixer
+from pathlib import Path
 
+from class_lib import BaseEffect, BaseInstrument, Mixer
+from.bass_sampler import BassSampler
+from .drum_sampler import DrumSampler
 from .reverb import Reverb
-from .sampler import Sampler
 from .sequencer import Sequencer
 
 from supriya import Server
@@ -44,13 +46,23 @@ class SupriyaStudio:
         return {reverb_synth.name: reverb_synth}
     
     def _initialize_instruments(self) -> dict[str, BaseInstrument]:
-        sampler = Sampler(
+        bass_sampler = BassSampler(
+            samples_path= Path(__file__).parent / 'samples/roland_tb_303',
             midi_channels=[x for x in range(16)],
+            name='bass sampler',
+            server=self.server, 
+            synth_definition=sample_player
+        )
+        
+        drum_sampler = DrumSampler(
+            samples_path= Path(__file__).parent / 'samples/roland_tr_909',
+            midi_channels=[x for x in range(16)],
+            name='drum sampler',
             server=self.server, 
             synth_definition=sample_player
         )
 
-        return {sampler.name: sampler}
+        return {bass_sampler.name: bass_sampler, drum_sampler.name: drum_sampler}
     
     def _initialize_mixer(self) -> Mixer:
         return Mixer(

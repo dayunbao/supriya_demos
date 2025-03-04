@@ -101,7 +101,7 @@ class Track(BaseTrack):
         self._instrument.handle_midi_message(message=message)
         
         # The Sequencer is responsible for recording the notes
-        if self.is_recording:
+        if self.is_recording and message.type == 'note_on' or message.type == 'note_off':
             # recorded_time is in a factor of quantization_delta, and is based
             # on the scaled value of the message's note.
             # This makes playback very simple because for each invocation of 

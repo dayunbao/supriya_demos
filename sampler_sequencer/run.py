@@ -55,14 +55,14 @@ class QuantizationValidator(BaseValidator):
 
         return result
 
-class InstrumentNameValidator(BaseValidator):
-    def __init__(self, instruments: list[str]):
+class ProgramNameValidator(BaseValidator):
+    def __init__(self, program_names: list[str]):
         super().__init__()
-        self.instruments = instruments
+        self.program_names = program_names
     
     def validate(self, input_string):
         result = True
-        if input_string not in self.instruments:
+        if input_string not in self.program_names:
             result = False
 
         return result
@@ -81,11 +81,11 @@ class TrackNumberValidator(BaseValidator):
 
 def add_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
     prompt_util = PromptUtils(screen=menu.screen)
-    instrument_names = [name for name in sequencer.instruments.keys()]
-    track_add_validator = InstrumentNameValidator(instruments=instrument_names)
+    program_names = [p for p in sequencer.tracks]
+    track_add_validator = ProgramNameValidator(program_names=program_names)
 
-    joined_names = ', '.join(instrument_names)
-    prompt = f'Enter one of the following instruments: {joined_names}'
+    joined_names = ', '.join(program_names)
+    prompt = f'Enter one of the following programs: {joined_names}'
 
     try:
         name, is_valid = prompt_util.input(
@@ -94,9 +94,9 @@ def add_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
             validators=[track_add_validator]
         )
         if is_valid:
-            sequencer.add_track(instrument_name=name)
+            sequencer.add_track(program_name=name)
         else:    
-            prompt_util.println(f'Invalid instrument name provided: {name}')
+            prompt_util.println(f'Invalid program name provided: {name}')
             return
     except UserQuit:
         return
@@ -164,23 +164,9 @@ def create_menu(sequencer: Sequencer, supriya_studio: SupriyaStudio) -> ConsoleM
         clear_screen=False,
     )
 
-    record_change_instrument_menu_item = FunctionItem(
-        text='Change instrument',
-        function=change_instrument,
-        kwargs={'menu': record_menu, 'sequencer': sequencer},
-        menu=record_menu,
-    )
-
     record_change_track_menu_item = FunctionItem(
         text='Change track',
         function=change_track,
-        kwargs={'menu': record_menu, 'sequencer': sequencer},
-        menu=record_menu,
-    )
-
-    record_change_both_menu_item = FunctionItem(
-        text='Change instrument and track',
-        function=change_both,
         kwargs={'menu': record_menu, 'sequencer': sequencer},
         menu=record_menu,
     )
@@ -196,9 +182,7 @@ def create_menu(sequencer: Sequencer, supriya_studio: SupriyaStudio) -> ConsoleM
         menu=record_menu,
     )
 
-    record_menu.append_item(record_change_instrument_menu_item)
     record_menu.append_item(record_change_track_menu_item)
-    record_menu.append_item(record_change_both_menu_item)
     record_menu.append_item(record_start_menu_item)
     record_menu.append_item(record_stop_menu_item)
     record_menu.append_item(back_to_main_menu_item)
@@ -282,42 +266,16 @@ def create_menu(sequencer: Sequencer, supriya_studio: SupriyaStudio) -> ConsoleM
     return main_menu
 
 def create_record_menu_prologue(sequencer: Sequencer) -> str:
-    selected_instrument_name = sequencer.get_selected_instrument_name()
+    selected_program_name = sequencer.sampler.selected_program.name
     selected_track_number = f'{sequencer.get_selected_track_number() + 1}'
-    record_menu_prologue_text = f'Selected instrument: {selected_instrument_name}\nSelected track number: {selected_track_number}'
+    record_menu_prologue_text = f'Selected program: {selected_program_name}\nSelected track number: {selected_track_number}'
 
     return record_menu_prologue_text
 
-def change_both(sequencer: Sequencer) -> None:
-    change_instrument(sequencer=sequencer)
-    change_track(sequencer=sequencer)
-
-def change_instrument(menu: ConsoleMenu, sequencer: Sequencer) -> None:
-    prompt_util = PromptUtils(screen=menu.screen)
-    instrument_names = [name for name in sequencer.instruments.keys()]
-    instrument_name_validator = InstrumentNameValidator(instruments=instrument_names)
-
-    joined_names = ', '.join(instrument_names)
-    prompt = f'Enter one of the following instruments: {joined_names}'
-
-    try:
-        name, is_valid = prompt_util.input(
-            prompt=prompt,
-            enable_quit=True,
-            validators=[instrument_name_validator]
-        )
-        if is_valid:
-            sequencer.set_selected_instrument_by_name(name=name) 
-        else:    
-            prompt_util.println(f'Invalid instrument name provided: {name}')
-            return
-    except UserQuit:
-        return
-
 def change_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
     prompt_util = PromptUtils(screen=menu.screen)
-    selected_instrument = sequencer.selected_instrument.name
-    num_tracks = len(sequencer.tracks[selected_instrument])
+    selected_program = sequencer.sampler.selected_program.name
+    num_tracks = len(sequencer.tracks[selected_program])
     track_number_validator = TrackNumberValidator(number_of_tracks=num_tracks)
 
     prompt = 'Enter a number in the range '
@@ -334,7 +292,7 @@ def change_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
         )
         if is_valid:
             sequencer.set_selected_track_by_track_number(
-                instrument_name=selected_instrument,
+                program_name=selected_program,
                 track_number=int(track_number) - 1
             )
         else:    
@@ -346,11 +304,11 @@ def change_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
 def delete_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
     prompt_util = PromptUtils(screen=menu.screen)
 
-    instrument_names = [name for name in sequencer.instruments.keys()]
-    track_add_validator = InstrumentNameValidator(instruments=instrument_names)
+    program_names = [p for p in sequencer.tracks]
+    track_add_validator = ProgramNameValidator(program_names=program_names)
 
-    joined_names = ', '.join(instrument_names)
-    prompt = f'Enter one of the following instruments: {joined_names}'
+    joined_names = ', '.join(program_names)
+    prompt = f'Enter one of the following programs: {joined_names}'
 
     try:
         name, is_valid = prompt_util.input(
@@ -361,7 +319,7 @@ def delete_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
         if is_valid:
             pass
         else:    
-            prompt_util.println(f'Invalid instrument name provided: {name}')
+            prompt_util.println(f'Invalid program name provided: {name}')
             return
     except UserQuit:
         return
@@ -382,7 +340,7 @@ def delete_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
             validators=[track_delete_validator]
         )
         if is_valid:
-            sequencer.delete_track(instrument_name=name, track_number=int(track_number) - 1)
+            sequencer.delete_track(program_name=name, track_number=int(track_number) - 1)
         else:    
             prompt_util.println(f'Invalid track number provided: {track_number}')
             return
@@ -448,52 +406,6 @@ def get_quantization_input(menu: ConsoleMenu, sequencer: Sequencer) -> None:
             return
     except UserQuit:
         return
-
-# Remove me
-def initialize_effects(server: Server) -> Reverb:
-    reverb_effect = Reverb(
-        name='reverb',
-        server=server,
-        synth_def=reverb,
-        parameters={
-            'in_bus': 2,
-            'mix': 0.33,
-            'room_size': 0.5,
-            'out_bus': 0,
-        }
-    )
-
-    return reverb_effect
-
-# Remove me
-def initialize_instruments(server: Server) -> Sampler:
-    sampler = Sampler(
-        midi_channels=[x for x in range(16)],
-        server=server, 
-        synth_definition=sample_player
-    )
-
-    # supriya_303 = SP303(
-    #     midi_channels=[x for x in range(16)],
-    #     server=server, 
-    #     synth_definition=sp_303
-    # )
-
-    return sampler
-
-# Remove me
-def initialize_sequencer(server: Server, bpm: int, quantization: str) -> Sequencer:
-    reverb = initialize_effects(server=server)
-    sampler = initialize_instruments(server=server)
-    sequencer = Sequencer(
-        bpm=bpm, 
-        effects=[reverb],
-        instruments={sampler.name: sampler}, #  , supriya_303.name: supriya_303},
-        quantization=quantization,
-        server=server,
-    )
-
-    return sequencer
 
 def start() -> None:
     supriya_studio = SupriyaStudio()

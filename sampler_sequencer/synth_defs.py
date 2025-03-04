@@ -20,7 +20,6 @@ from supriya.ugens import (
     In,
     Limiter, 
     Out,
-    Pan2,
     PlayBuf,
 )
 from supriya.ugens.diskio import DiskOut
@@ -39,13 +38,11 @@ def reverb(
     out_bus=0,
 ):
     signal = In.ar(bus=in_bus, channel_count=2)
-    signal = Pan2.ar(source=signal, position=0.0, level=1.0)
     signal = FreeVerb.ar(source=signal, mix=mix, room_size=room_size, damping=damping)
     Out.ar(bus=out_bus, source=signal)
 
 @synthdef()
 def sample_player(buffer, out_bus):
     signal = PlayBuf.ar(buffer_id=buffer, channel_count=1, done_action=2)
-    signal = Pan2.ar(source=signal, position=0.0, level=1.0)
-    # signal = Limiter.ar(duration=0.01, level=0.003, source=signal)
+    signal = Limiter.ar(duration=0.01, level=0.03, source=signal)
     Out.ar(bus=out_bus, source=signal)

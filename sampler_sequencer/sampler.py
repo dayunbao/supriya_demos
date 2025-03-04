@@ -19,30 +19,31 @@ from typing import Optional
 
 from mido import Message
 
-from supriya import Buffer, Group, Server, SynthDef
+from supriya import Group, Server, SynthDef
 
 from class_lib import BaseInstrument
+from .program import Program
 
 class Sampler(BaseInstrument):
     def __init__(
             self, 
-            midi_channels: list[int],
             name: str,
-            samples_path: Path,
+            samples_paths: list[Path],
             server: Server, 
             synth_definition: SynthDef,
             group: Optional[Group | None]=None,
         ):
         super().__init__(
-            midi_channels,
-            server, 
-            synth_definition, 
+            server=server, 
+            synth_definition=synth_definition, 
             group=group,
         )
-        self._samples_path = samples_path
-        self._buffers = self._load_buffers()
+        self.programs = self._create_programs(samples_paths=samples_paths)
+        self.num_programs = len(self.programs)
+        self.selected_program = self.programs[0]
         self._load_synthdefs()
         self._name = name
+        self.sample_select_cc_num = 0
 
     @property
     def name(self) -> str:
@@ -51,10 +52,94 @@ class Sampler(BaseInstrument):
     @name.setter
     def name(self, name: str) -> str:
         self._name = name
+    
+    def _create_programs(self, samples_paths: list[Path]) -> list[Program]:
+        programs = []
+        for number, path in enumerate(samples_paths):
+            programs.append(
+                Program(
+                    name=path.name,
+                    program_number=number,
+                    samples_path=path,
+                    server=self._server,
+                )
+            )
 
-    def _load_buffers(self) -> list[Buffer]:
-        buffers = []
-        for sample_path in sorted(self._samples_path.rglob(pattern='*.wav')):
-            buffers.append(self._server.add_buffer(file_path=str(sample_path)))
+        return programs
+
+    def handle_midi_message(self, message: Message) -> None:
+        if message.type == 'control_change':
+            self._on_control_change(message=message)
         
-        return buffers
+        if message.type == 'note_off':
+            self._on_note_off(message=message)
+        
+        if message.type == 'note_on':
+            self._on_note_on(message=message)
+        
+        if message.type == 'program_change':
+            self._on_program_change(message=message)
+
+    def _on_control_change(self, message: Message) -> None:
+        """Handle a Control Change message.
+        
+        Args:
+            message: a Control Change message
+        """
+        if message.is_cc(self.sample_select_cc_num):
+            sample_number = self.scale(
+                value=message.value,
+                target_min=0,
+                target_max=self.selected_program.number_samples - 1,
+            )
+            self.selected_program.selected_sample = self.selected_program.buffers[sample_number]
+
+    def _on_note_off(self, message: Message) -> None:
+        """Play a Note Off message.
+        
+        Args:
+            message: a Note Off Message
+        """
+        pass
+
+    def _on_note_on(self, message: Message) -> None:
+        """Play a Note On message.
+        
+        Args:
+            message: a Note On Message
+        """
+        buffer = self.selected_program.selected_sample
+        self.group.add_synth(
+            synthdef=self._synth_definition, 
+            buffer=buffer,
+            out_bus=self.out_bus,
+        )
+    
+    def _on_program_change(self, message: Message) -> None:
+        """Handle a Program Change message.
+        
+        Args:
+            message: a Program Change message
+        """
+        program = self.scale(
+            value=message.program, 
+            target_min=0, 
+            target_max=self.num_programs - 1,
+        )
+        self.selected_program = self.programs[program]
+
+    def scale(self, value: int, target_min: int, target_max: int) -> int:
+        """
+        Linearly scale a value from one range to another.
+
+        Args:
+            source_value (int): The value to be scaled.
+
+        Returns:
+            int: The scaled value in the target range.
+        """
+        source_min = 0
+        source_max = 127
+        
+        scaled_value = (value - source_min) * (target_max - target_min) / (source_max - source_min) + target_min
+        return round(scaled_value)

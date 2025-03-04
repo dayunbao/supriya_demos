@@ -25,7 +25,6 @@ from supriya import Group, Server, SynthDef
 class BaseInstrument(ABC):
     def __init__(
         self,
-        midi_channels: list[int],
         server: Server, 
         synth_definition: SynthDef,
         group: Optional[Group | None]=None,
@@ -35,7 +34,6 @@ class BaseInstrument(ABC):
         self.out_bus = 0
         self._server = server
         self._synth_definition = synth_definition
-        self._midi_channels = midi_channels
         self._synths = {}
 
     @property

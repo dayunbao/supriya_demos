@@ -23,34 +23,25 @@ from supriya.clocks import ClockContext, TimeUnit
 
 from class_lib import MIDIHandler
 from class_lib import BaseSequencer
-from class_lib import BaseInstrument
+from .sampler import Sampler
 from .track import Track
 
 class Sequencer(BaseSequencer):    
     def __init__(
             self, 
             bpm: int, 
-            instruments: dict[str, BaseInstrument],
             quantization: str,
+            sampler: Sampler,
             server: Server,
     ):
         super().__init__(bpm, quantization)
-        self._instruments = instruments
+        self.sampler = sampler
         self._is_recording = False
-        self._midi_handler = self._initialize_midi_handler()
         self.playing_tracks: list[Track] = []
         self.server = server
-        self._tracks: dict[str, list[Track]] = self._initialize_tracks()
-        self._selected_instrument = list(self._instruments.values())[0]
-        self._selected_track = self._tracks[self._selected_instrument.name][0]        
-
-    @property
-    def instruments(self) -> dict[str, BaseInstrument]:
-        return self._instruments
-    
-    @instruments.setter
-    def instruments(self, instruments: dict[str, BaseInstrument]) -> None:
-        self._instruments = instruments
+        self.tracks: dict[str, list[Track]] = self._initialize_tracks()
+        self.selected_track = self.tracks[self.sampler.selected_program.name][0]
+        self._midi_handler = self._initialize_midi_handler()
 
     @property
     def is_recording(self) -> bool:
@@ -66,7 +57,7 @@ class Sequencer(BaseSequencer):
     @property
     def midi_handler(self) -> MIDIHandler:
         return self._midi_handler
-    
+
     @midi_handler.setter
     def midi_handler(self, midi_handler: MIDIHandler) -> None:
         self._midi_handler = midi_handler
@@ -92,40 +83,16 @@ class Sequencer(BaseSequencer):
             for track in tracks:
                 track.quantization_delta = self._quantization_delta
 
-    @property
-    def selected_instrument(self) -> BaseInstrument:
-        return self._selected_instrument
-
-    @selected_instrument.setter
-    def selected_instrument(self, instrument: BaseInstrument) -> None:
-        self._selected_instrument = instrument
-
-    @property
-    def selected_track(self) -> Track:
-        return self._selected_track
-    
-    @selected_track.setter
-    def selected_track(self, track: Track) -> None:
-        self._selected_track = track
-
-    @property
-    def tracks(self) -> dict[str, list[Track]]:
-        return self._tracks
-    
-    @tracks.setter
-    def tracks(self, tracks: dict[str, list[Track]]) -> None:
-        self._tracks = tracks
-
-    def add_track(self, instrument_name: str) -> None:
+    def add_track(self, program_name: str) -> None:
         added_track_number = 0
         
-        if len(self.tracks[instrument_name]) > 0:
-            added_track_number = self.tracks[instrument_name][-1].track_number + 1
+        if len(self.tracks[program_name]) > 0:
+            added_track_number = self.tracks[program_name][-1].track_number + 1
         
-        self.tracks[instrument_name].append(
+        self.tracks[program_name].append(
             Track(
                 clock=self._clock,
-                instrument=self.instruments[instrument_name],
+                instrument=self.sampler,
                 is_recording=self.is_recording,
                 quantization_delta=self.quantization_delta,
                 sequencer_steps=self._SEQUENCER_STEPS,
@@ -134,19 +101,16 @@ class Sequencer(BaseSequencer):
             )
         )
 
-    def delete_track(self, instrument_name: str, track_number: int) -> None:
-        removed_track_number = self.tracks[instrument_name][track_number].track_number
-        del self.tracks[instrument_name][track_number]
-        num_tracks = len(self.tracks[instrument_name])
+    def delete_track(self, program_name: str, track_number: int) -> None:
+        removed_track_number = self.tracks[program_name][track_number].track_number
+        del self.tracks[program_name][track_number]
+        num_tracks = len(self.tracks[program_name])
 
         for tn in range(removed_track_number, num_tracks):
-            self.tracks[instrument_name][tn].track_number = tn
-
-    def get_selected_instrument_name(self) -> str:
-        return self._selected_instrument.name
+            self.tracks[program_name][tn].track_number = tn
     
     def get_selected_track_number(self) -> int:
-        return self._selected_track.track_number
+        return self.selected_track.track_number
 
     def handle_midi_message(self, message: Message) -> None:
         """
@@ -155,7 +119,7 @@ class Sequencer(BaseSequencer):
         """
         if not self.is_recording:
             # Just play, don't record.
-            self.selected_instrument.handle_midi_message(message=message)
+            self.sampler.handle_midi_message(message=message)
         else:
             # The track will record and then send it to the instrument to play.
             self.selected_track.handle_midi_message(message=message)
@@ -164,12 +128,12 @@ class Sequencer(BaseSequencer):
         return MIDIHandler(message_handler_callback=self.handle_midi_message)
 
     def _initialize_tracks(self) -> dict[str, list[Track]]:
-        tracks_by_instrument = defaultdict(list)
-        for instrument in self.instruments.values():
-            tracks_by_instrument[instrument.name].append(
+        tracks_by_program = defaultdict(list)
+        for program in self.sampler.programs:
+            tracks_by_program[program.name].append(
                 Track(
                     clock=self._clock,
-                    instrument=instrument,
+                    instrument=self.sampler,
                     is_recording=self.is_recording,
                     quantization_delta=self.quantization_delta,
                     sequencer_steps=self._SEQUENCER_STEPS,
@@ -178,7 +142,7 @@ class Sequencer(BaseSequencer):
                 )
             )
         
-        return tracks_by_instrument
+        return tracks_by_program
 
     def sequencer_clock_callback(
         self, 
@@ -191,13 +155,8 @@ class Sequencer(BaseSequencer):
 
         return delta, TimeUnit.BEATS
 
-    def set_selected_instrument_by_name(self, name: str) -> None:
-        self.selected_instrument = self.instruments[name]
-        # Also need to set the selected track
-        self.selected_track = self.tracks[self.selected_instrument.name][0]
-
-    def set_selected_track_by_track_number(self, instrument_name: str, track_number: int) -> None:
-        self.selected_track = self.tracks[instrument_name][track_number]
+    def set_selected_track_by_track_number(self, program_name: str, track_number: int) -> None:
+        self.selected_track = self.tracks[program_name][track_number]
 
     def start_playback(self) -> None:
         self._clock.start()

@@ -27,27 +27,24 @@ class Mixer:
     def __init__(
         self, 
         effects: dict[str, BaseEffect],
-        instruments: dict[str, BaseInstrument], 
+        instrument: BaseInstrument, 
         server: Server
     ) -> None:
         self.server = server
         self._add_synthdefs()
         
         self.main_audio_out_bus: Bus = self.server.add_bus(calculation_rate='audio')
-        print()
-        print(f'self.main_audio_out_bus={self.main_audio_out_bus}')
-        print()
         self.effects_chain_bus: Bus = self.server.add_bus(calculation_rate='audio')
 
         # Holds all of the other groups
         self.mixer_group: Group = self.server.add_group()
         
-        self.instruments = instruments
-        self.instruments_group = self.mixer_group.add_group(add_action=AddAction.ADD_TO_TAIL)
-        self._add_instruments_to_group()
+        self.instrument = instrument
+        self.instrument_group = self.mixer_group.add_group(add_action=AddAction.ADD_TO_TAIL)
+        self._add_instrument_to_group()
 
         self.channel_group = self.mixer_group.add_group(add_action=AddAction.ADD_TO_TAIL)
-        self.channels: dict[str, Channel] = self._create_channels()
+        self.channel: Channel = self._create_channel()
 
         self.effects = effects
         self.effects_chain_group = self.mixer_group.add_group(add_action=AddAction.ADD_TO_TAIL)
@@ -61,31 +58,27 @@ class Mixer:
             in_bus=self.main_audio_out_bus,
         )
 
-    def _add_instruments_to_group(self) -> None:
-        for instrument in self.instruments.values():
-            instrument.group = self.instruments_group
+    def _add_instrument_to_group(self) -> None:
+        self.instrument.group = self.instrument_group
 
     def _add_synthdefs(self) -> None:
         self.server.add_synthdefs(main_audio_output)
         self.server.sync()
     
-    def _create_channels(self) -> dict[str, Channel]:
-        channels = {}
-        for instrument in self.instruments.values():
-            channel = Channel(
-                bus=self.server.add_bus(calculation_rate='audio'),
-                group=self.channel_group,
-                name=instrument.name,
-                out_bus=self.effects_chain_bus,
-                server=self.server
-            )
-            
-            # Put me in own method
-            instrument.out_bus = channel.in_bus
-            channel.create_synths()
-            channels[instrument.name] = channel
+    def _create_channel(self) -> Channel:
+        channel = Channel(
+            bus=self.server.add_bus(calculation_rate='audio'),
+            group=self.channel_group,
+            name=self.instrument.name,
+            out_bus=self.effects_chain_bus,
+            server=self.server
+        )
         
-        return channels
+        # Put me in own method
+        self.instrument.out_bus = channel.in_bus
+        channel.create_synths()
+        
+        return channel
     
     def _create_effects_chain(self) -> EffectsChain:
         effects_chain =  EffectsChain(
@@ -101,9 +94,7 @@ class Mixer:
         return effects_chain
 
     def start_recording(self) -> None:
-        for channel in self.channels.values():
-            channel.start_recording_to_disk()
+        self.channel.start_recording_to_disk()
 
     def stop_recording(self) -> None:
-        for channel in self.channels.values():
-            channel.stop_recording_to_disk()
+        self.channel.stop_recording_to_disk()

@@ -1,3 +1,19 @@
+"""
+Copyright 2025, Andrew Clark
+
+This program is free software: you can redistribute it and/or modify 
+it under the terms of the GNU General Public License as published by 
+the Free Software Foundation, either version 3 of the License, or 
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful, 
+but WITHOUT ANY WARRANTY; without even the implied warranty of 
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the 
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License 
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+"""
 from supriya import AddAction, Bus, Group, Server
 
 from class_lib import BaseEffect
@@ -15,15 +31,7 @@ class EffectsChain:
         self.server = server
         self.bus = bus
         self.out_bus = out_bus
-        self._group = group
-    
-    @property
-    def group(self) -> Group:
-        return self._group
-
-    @group.setter
-    def group(self, group: Group) -> None:
-        self._group = group
+        self.group = group
 
     def create_synths(self) -> None:
         self._route_effects_signals()
@@ -45,5 +53,5 @@ class EffectsChain:
             
             if effect.priority == len(self.effects) - 1:
                 # The last effect in the chain should send its audio signal
-                # out over the chain's bus.
+                # out over the provided bus.
                 effect.out_bus = self.out_bus

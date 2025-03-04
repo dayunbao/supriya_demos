@@ -37,26 +37,10 @@ class BaseEffect(ABC):
         self.bus = self.server.add_bus(calculation_rate='audio')
         self.in_bus = self.bus
         #  Default to standard out
-        self._out_bus = out_bus
+        self.out_bus = out_bus
         #  Where in the signal processing chain the effect should be.
         self.priority = 0
         self._load_synth_def()
-    
-    @property
-    def group(self) -> Group:
-        return self._group
-    
-    @group.setter
-    def group(self, group: Group) -> None:
-        self._group = group
-    
-    @property
-    def out_bus(self) -> int | Bus:
-        self._out_bus
-    
-    @out_bus.setter
-    def out_bus(self, out_bus: int | Bus) -> None:
-        self._out_bus = out_bus
 
     @abstractmethod
     def get_parameters(self) -> dict[str, any]:

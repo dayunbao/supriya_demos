@@ -1,3 +1,19 @@
+"""
+Copyright 2025, Andrew Clark
+
+This program is free software: you can redistribute it and/or modify 
+it under the terms of the GNU General Public License as published by 
+the Free Software Foundation, either version 3 of the License, or 
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful, 
+but WITHOUT ANY WARRANTY; without even the implied warranty of 
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the 
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License 
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+"""
 from pathlib import Path
 
 from supriya import AddAction, Buffer, Bus, Group, Server, Synth
@@ -25,7 +41,7 @@ class Channel:
         # The bus that instruments send audio to.
         self.bus = bus
         self.in_bus = self.bus
-        self._out_bus = out_bus
+        self.out_bus = out_bus
         self.eq_bus: Bus = self.server.add_bus(calculation_rate='audio')
         self.pan_bus = self.server.add_bus(calculation_rate='audio')
         
@@ -36,27 +52,19 @@ class Channel:
         self.recording_buffer: Buffer | None = None
         self.audio_to_disk_synth: Synth | None = None
 
-    @property
-    def out_bus(self) -> Bus:
-        self._out_bus
-    
-    @out_bus.setter
-    def out_bus(self, out_bus: Bus) -> None:
-        self._out_bus = out_bus
-
     def _add_synthdefs(self) -> None:
         self.server.add_synthdefs(gain, pan, parametric_equalizer)
         self.server.sync()
     
     def create_synths(self) -> None:
-        self.gain_synth: Synth = self.group.add_synth(
+        self.gain_synth = self.group.add_synth(
             synthdef=gain, 
             amplitude=1.0,
             in_bus=self.in_bus,
             out_bus = self.eq_bus
         )
         
-        self.eq_synth: Synth = self.group.add_synth(
+        self.eq_synth = self.group.add_synth(
             synthdef=parametric_equalizer,
             frequency=1200,
             gain=0.0,
@@ -65,10 +73,10 @@ class Channel:
             out_bus = self.pan_bus,
         )
 
-        self.pan_synth: Synth = self.group.add_synth(
+        self.pan_synth = self.group.add_synth(
             synthdef=pan,
             in_bus = self.pan_bus,
-            out_bus = self._out_bus,
+            out_bus = self.out_bus,
             pan_position=0.0,
         )
     

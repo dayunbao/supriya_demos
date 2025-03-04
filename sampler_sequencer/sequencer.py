@@ -36,8 +36,8 @@ class Sequencer(BaseSequencer):
     ):
         super().__init__(bpm, quantization)
         self._instruments = instruments
-        self._midi_handler = self._initialize_midi_handler()
         self._is_recording = False
+        self._midi_handler = self._initialize_midi_handler()
         self.playing_tracks: list[Track] = []
         self.server = server
         self._tracks: dict[str, list[Track]] = self._initialize_tracks()

@@ -22,15 +22,17 @@ from mido import Message
 from supriya import Buffer, Bus, Group, Server, Synth
 from supriya.clocks import Clock, ClockContext, TimeUnit
 
-from class_lib import BaseTrack, BaseInstrument
-from .synth_defs import audio_to_disk
+from rest import Rest
+from sampler import Sampler
+from sampler_note import SamplerNote
+from synth_defs import audio_to_disk
 
-class Track(BaseTrack):
+class Track:
     def __init__(
             self, 
             clock: Clock,
             # group: Group,
-            instrument: BaseInstrument,
+            instrument: Sampler,
             is_recording: bool,
             quantization_delta: float,
             # recording_bus: Bus | int, 
@@ -38,32 +40,23 @@ class Track(BaseTrack):
             server: Server,
             track_number: int,
         ):
-        super().__init__(
-            clock, 
-            instrument, 
-            quantization_delta, 
-            sequencer_steps,
-            track_number,
-        )
+        self.clock = clock
+        self.clock_event_id: int | None = None
+        self.instrument = instrument
+        self.quantization_delta = quantization_delta
+        self.sequencer_steps =  sequencer_steps
+        self.track_number = track_number
         # self.group = group
         self.is_recording = is_recording
         # self.recording_bus = recording_bus
-        self._recorded_notes: dict[float, list[Message]] = defaultdict(list)
+        self.recorded_notes: dict[float, list[SamplerNote]] = defaultdict(list)
         self.server = server
-        self._load_synthdef()
+        # self._load_synthdef()
         # self.BUFFER_CHANNELS = 2
         # self.BUFFER_FRAME_COUNT = 262144
         # self.buffer_file_path = self._create_buffer_file_path()
         # self.recording_buffer: Buffer | None = None
         # self.audio_to_disk_synth: Synth | None = None
-
-    @property
-    def recorded_notes(self) -> dict[float, list[Message]]:
-        return self._recorded_notes
-    
-    @recorded_notes.setter
-    def recorded_notes(self, notes: dict[float, list[Message]]):
-        self._recorded_notes = notes
 
     # def _create_buffer(self) -> Buffer:
     #     buffer = self.server.add_buffer(
@@ -92,31 +85,32 @@ class Track(BaseTrack):
     #     return file_path
 
     def erase_recorded_notes(self) -> None:
-        self._recorded_notes.clear()
+        self.recorded_notes.clear()
     
-    def handle_midi_message(self, message: Message) -> None:
+    def handle_midi_message(self, sampler_note: SamplerNote) -> None:
         """Decide how to handle incoming MIDI notes based on the mode."""
         # The SynthHandler is responsible for playing notes
         # We play a note whether or note we're recording. 
-        self._instrument.handle_midi_message(message=message)
+        self.instrument.handle_midi_message(sampler_note=sampler_note)
         
         # The Sequencer is responsible for recording the notes
-        if self.is_recording and message.type == 'note_on' or message.type == 'note_off':
+        if self.is_recording and sampler_note.message.type == 'note_on':
             # recorded_time is in a factor of quantization_delta, and is based
             # on the scaled value of the message's note.
             # This makes playback very simple because for each invocation of 
             # the clock's callback, we can simply check for messages at the delta.
-            recorded_time = (message.note % self._sequencer_steps) * self.quantization_delta
-            recorded_message = message.copy(time=recorded_time)
-            self.recorded_notes[recorded_time].append(recorded_message)
+            recorded_time = (sampler_note.message.note % self.sequencer_steps) * self.quantization_delta
+            recorded_message = sampler_note.message.copy(time=recorded_time)
+            recorded_sampler_note = SamplerNote(program=sampler_note.program, message=recorded_message)
+            self.recorded_notes[recorded_time].append(recorded_sampler_note)
 
-    def _load_synthdef(self) -> None:
-        self.server.add_synthdefs(audio_to_disk)
+    # def _load_synthdef(self) -> None:
+    #     self.server.add_synthdefs(audio_to_disk)
 
     def start_playback(self) -> None:
         # self.start_recording_to_disk()
 
-        self._clock_event_id = self._clock.cue(
+        self.clock_event_id = self.clock.cue(
             kwargs={'delta': self.quantization_delta},
             procedure=self.track_clock_callback
         )
@@ -139,7 +133,9 @@ class Track(BaseTrack):
     #     )
 
     def stop_playback(self) -> None:
-        super().stop_playback()
+        """Stop playing track."""
+        if self.clock_event_id is not None:
+            self.clock.cancel(self.clock_event_id)
         # self.stop_recording_to_disk()
 
     # def stop_recording_to_disk(self) -> None:
@@ -160,10 +156,11 @@ class Track(BaseTrack):
         you can specify SECONDS as the time_unit to have it called outside of a 
         musical rhythmic context.
         """
-        recorded_notes_index = delta * (context.event.invocations % self._sequencer_steps )
+        recorded_notes_index = delta * (context.event.invocations % self.sequencer_steps )
 
-        midi_messages = self.recorded_notes[recorded_notes_index]
-        for message in midi_messages:
-            self._instrument.handle_midi_message(message=message)
+        sampler_notes = self.recorded_notes.get(recorded_notes_index, Rest)
+        if sampler_notes is not Rest:
+            for sampler_note in sampler_notes:
+                self.instrument.handle_midi_message(sampler_note=sampler_note)
         
         return delta, TimeUnit.BEATS

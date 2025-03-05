@@ -16,7 +16,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 from sys import exit
 from functools import partial
-from typing import get_args
 
 from consolemenu import ConsoleMenu, MenuFormatBuilder
 from consolemenu.items import FunctionItem, SubmenuItem, ExitItem
@@ -24,45 +23,15 @@ from consolemenu.prompt_utils import PromptUtils, UserQuit
 from consolemenu.validators.base import BaseValidator
 
 from supriya import Server
-from supriya.clocks import Quantization
 
-from .reverb import Reverb
-from .sampler import Sampler
-from .sequencer import Sequencer
-from .supriya_studio import SupriyaStudio
-
-from .synth_defs import reverb, sample_player
+from sequencer import Sequencer
+from supriya_studio import SupriyaStudio
 
 
 class BPMValidator(BaseValidator):
     def validate(self, input_string):
         result = True
         if int(input_string) < 60 or int(input_string) > 220:
-            result = False
-
-        return result
-
-class QuantizationValidator(BaseValidator):
-    def validate(self, input_string):
-        """Make sure the quantization is one that matches what's available.
-
-        Args:
-            quantization: a string in the form 1/4, 1/8T, etc.
-        """
-        result = True
-        if input_string not in get_args(Quantization):
-            result = False
-
-        return result
-
-class ProgramNameValidator(BaseValidator):
-    def __init__(self, program_names: list[str]):
-        super().__init__()
-        self.program_names = program_names
-    
-    def validate(self, input_string):
-        result = True
-        if input_string not in self.program_names:
             result = False
 
         return result
@@ -81,25 +50,8 @@ class TrackNumberValidator(BaseValidator):
 
 def add_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
     prompt_util = PromptUtils(screen=menu.screen)
-    program_names = [p for p in sequencer.tracks]
-    track_add_validator = ProgramNameValidator(program_names=program_names)
-
-    joined_names = ', '.join(program_names)
-    prompt = f'Enter one of the following programs: {joined_names}'
-
-    try:
-        name, is_valid = prompt_util.input(
-            prompt=prompt,
-            enable_quit=True,
-            validators=[track_add_validator]
-        )
-        if is_valid:
-            sequencer.add_track(program_name=name)
-        else:    
-            prompt_util.println(f'Invalid program name provided: {name}')
-            return
-    except UserQuit:
-        return
+    sequencer.add_track()
+    prompt_util.println(f'Added track number: {sequencer.tracks[-1].track_number + 1}.')
 
 def create_menu(sequencer: Sequencer, supriya_studio: SupriyaStudio) -> ConsoleMenu:
     main_menu = ConsoleMenu(
@@ -208,14 +160,8 @@ def create_menu(sequencer: Sequencer, supriya_studio: SupriyaStudio) -> ConsoleM
         function=get_bpm_input,
         kwargs={'menu': sequencer_menu, 'sequencer': sequencer}
     )
-    sequencer_change_quantization_menu_item = FunctionItem(
-        text='Change quantization',
-        function=get_quantization_input,
-        kwargs={'menu': sequencer_menu, 'sequencer': sequencer},
-    )
 
     sequencer_menu.append_item(sequencer_change_bpm_menu_item)
-    sequencer_menu.append_item(sequencer_change_quantization_menu_item)
     sequencer_menu.append_item(back_to_main_menu_item)
     # Add this to main_menu
     sequencer_menu_item = SubmenuItem(text='Sequencer', submenu=sequencer_menu, menu=main_menu)
@@ -266,16 +212,14 @@ def create_menu(sequencer: Sequencer, supriya_studio: SupriyaStudio) -> ConsoleM
     return main_menu
 
 def create_record_menu_prologue(sequencer: Sequencer) -> str:
-    selected_program_name = sequencer.sampler.selected_program.name
     selected_track_number = f'{sequencer.get_selected_track_number() + 1}'
-    record_menu_prologue_text = f'Selected program: {selected_program_name}\nSelected track number: {selected_track_number}'
+    record_menu_prologue_text = f'Selected track number: {selected_track_number}'
 
     return record_menu_prologue_text
 
 def change_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
     prompt_util = PromptUtils(screen=menu.screen)
-    selected_program = sequencer.sampler.selected_program.name
-    num_tracks = len(sequencer.tracks[selected_program])
+    num_tracks = len(sequencer.tracks)
     track_number_validator = TrackNumberValidator(number_of_tracks=num_tracks)
 
     prompt = 'Enter a number in the range '
@@ -292,7 +236,6 @@ def change_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
         )
         if is_valid:
             sequencer.set_selected_track_by_track_number(
-                program_name=selected_program,
                 track_number=int(track_number) - 1
             )
         else:    
@@ -303,28 +246,7 @@ def change_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
 
 def delete_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
     prompt_util = PromptUtils(screen=menu.screen)
-
-    program_names = [p for p in sequencer.tracks]
-    track_add_validator = ProgramNameValidator(program_names=program_names)
-
-    joined_names = ', '.join(program_names)
-    prompt = f'Enter one of the following programs: {joined_names}'
-
-    try:
-        name, is_valid = prompt_util.input(
-            prompt=prompt,
-            enable_quit=True,
-            validators=[track_add_validator]
-        )
-        if is_valid:
-            pass
-        else:    
-            prompt_util.println(f'Invalid program name provided: {name}')
-            return
-    except UserQuit:
-        return
-
-    num_tracks = len(sequencer.tracks[name])
+    num_tracks = len(sequencer.tracks)
     track_delete_validator = TrackNumberValidator(number_of_tracks=num_tracks)
 
     prompt = 'Enter a number in the range '
@@ -340,7 +262,7 @@ def delete_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
             validators=[track_delete_validator]
         )
         if is_valid:
-            sequencer.delete_track(program_name=name, track_number=int(track_number) - 1)
+            sequencer.delete_track(track_number=int(track_number) - 1)
         else:    
             prompt_util.println(f'Invalid track number provided: {track_number}')
             return
@@ -376,36 +298,12 @@ def get_bpm_input(menu: ConsoleMenu, sequencer: Sequencer) -> None:
         return
 
 def get_current_number_of_tracks(sequencer: Sequencer) -> str:
-    instruments_num_tracks_str = ''
-    for name, tracks in sequencer.tracks.items():
-        instruments_num_tracks_str += f'{name}: {len(tracks)}\n'
-
-    prologue_text = f'Current number of tracks\n{instruments_num_tracks_str}'
+    prologue_text = f'Current number of tracks\n{len(sequencer.tracks)}'
 
     return prologue_text
 
 def get_current_sequencer_settings(sequencer: Sequencer) -> str:
     return f'Current settings:\nBeats per minute(BPM) = {sequencer.bpm} * Quantization = {sequencer.quantization}'
-
-def get_quantization_input(menu: ConsoleMenu, sequencer: Sequencer) -> None:
-    prompt_util = PromptUtils(screen=menu.screen)
-    quantization_validator = QuantizationValidator()
-    valid_quantizations = ', '.join([q for q in get_args(Quantization)])
-    
-    try:
-        quantization, is_valid = prompt_util.input(
-            prompt=f'Enter one of {valid_quantizations}',
-            enable_quit=True,
-            validators=[quantization_validator],
-        )
-
-        if is_valid:
-            sequencer.quantization = quantization
-        else:
-            prompt_util.println(f'Invalid quantization provided: {quantization}')
-            return
-    except UserQuit:
-        return
 
 def start() -> None:
     supriya_studio = SupriyaStudio()

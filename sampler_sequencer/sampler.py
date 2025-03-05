@@ -17,14 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 from pathlib import Path
 from typing import Optional
 
-from mido import Message
-
 from supriya import Group, Server, SynthDef
 
-from class_lib import BaseInstrument
-from .program import Program
+from program import Program
+from sampler_note import SamplerNote
 
-class Sampler(BaseInstrument):
+class Sampler:
     def __init__(
             self, 
             name: str,
@@ -33,111 +31,77 @@ class Sampler(BaseInstrument):
             synth_definition: SynthDef,
             group: Optional[Group | None]=None,
         ):
-        super().__init__(
-            server=server, 
-            synth_definition=synth_definition, 
-            group=group,
-        )
-        self.programs = self._create_programs(samples_paths=samples_paths)
-        self.num_programs = len(self.programs)
-        self.selected_program = self.programs[0]
-        self._load_synthdefs()
-        self._name = name
+        self.group = group
+        self.in_bus = 2
+        self.name = name
+        self.out_bus = 0
+        self.server = server
         self.sample_select_cc_num = 0
+        self._synth_definition = synth_definition
+        self._load_synth_definitions()
 
-    @property
-    def name(self) -> str:
-        return self._name
+        self.programs = self._create_programs(samples_paths=samples_paths)
+        self.num_programs = len(self.programs.keys())
+        self.selected_program = list(self.programs.values())[0]
     
-    @name.setter
-    def name(self, name: str) -> str:
-        self._name = name
-    
-    def _create_programs(self, samples_paths: list[Path]) -> list[Program]:
-        programs = []
+    def _create_programs(self, samples_paths: list[Path]) -> dict[str, Program]:
+        programs = {}
         for number, path in enumerate(samples_paths):
-            programs.append(
-                Program(
-                    name=path.name,
-                    program_number=number,
-                    samples_path=path,
-                    server=self._server,
-                )
+            programs.update(
+                {
+                    path.name:
+                    Program(
+                        name=path.name,
+                        program_number=number,
+                        samples_path=path,
+                        server=self.server,
+                    )
+                }
             )
 
         return programs
 
-    def handle_midi_message(self, message: Message) -> None:
-        if message.type == 'control_change':
-            self._on_control_change(message=message)
+    def handle_midi_message(self, sampler_note: SamplerNote) -> None:
+        if sampler_note.message.type == 'control_change':
+            self._on_control_change(sampler_note=sampler_note)
         
-        if message.type == 'note_off':
-            self._on_note_off(message=message)
+        if sampler_note.message.type == 'note_on':
+            self._on_note_on(sampler_note=sampler_note)
         
-        if message.type == 'note_on':
-            self._on_note_on(message=message)
-        
-        if message.type == 'program_change':
-            self._on_program_change(message=message)
+        if sampler_note.message.type == 'program_change':
+            self._on_program_change(sampler_note=sampler_note)
 
-    def _on_control_change(self, message: Message) -> None:
-        """Handle a Control Change message.
-        
-        Args:
-            message: a Control Change message
-        """
-        if message.is_cc(self.sample_select_cc_num):
+    def _load_synth_definitions(self) -> None:
+        self.server.add_synthdefs(self._synth_definition)
+        # Wait for the server to fully load the SynthDef before proceeding.
+        self.server.sync()
+
+    def _on_control_change(self, sampler_note: SamplerNote) -> None:
+        if sampler_note.message.is_cc(self.sample_select_cc_num):
             sample_number = self.scale(
-                value=message.value,
+                value=sampler_note.message.value,
                 target_min=0,
                 target_max=self.selected_program.number_samples - 1,
             )
             self.selected_program.selected_sample = self.selected_program.buffers[sample_number]
 
-    def _on_note_off(self, message: Message) -> None:
-        """Play a Note Off message.
-        
-        Args:
-            message: a Note Off Message
-        """
-        pass
-
-    def _on_note_on(self, message: Message) -> None:
-        """Play a Note On message.
-        
-        Args:
-            message: a Note On Message
-        """
-        buffer = self.selected_program.selected_sample
+    def _on_note_on(self, sampler_note: SamplerNote) -> None:
+        buffer = self.programs[sampler_note.program].selected_sample
         self.group.add_synth(
             synthdef=self._synth_definition, 
             buffer=buffer,
             out_bus=self.out_bus,
         )
     
-    def _on_program_change(self, message: Message) -> None:
-        """Handle a Program Change message.
-        
-        Args:
-            message: a Program Change message
-        """
+    def _on_program_change(self, sampler_note: SamplerNote) -> None:
         program = self.scale(
-            value=message.program, 
+            value=sampler_note.message.program, 
             target_min=0, 
             target_max=self.num_programs - 1,
         )
-        self.selected_program = self.programs[program]
+        self.selected_program = list(self.programs.values())[program]
 
     def scale(self, value: int, target_min: int, target_max: int) -> int:
-        """
-        Linearly scale a value from one range to another.
-
-        Args:
-            source_value (int): The value to be scaled.
-
-        Returns:
-            int: The scaled value in the target range.
-        """
         source_min = 0
         source_max = 127
         

@@ -16,33 +16,21 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 from pathlib import Path
 
-from class_lib import BaseEffect, Mixer
-from .sampler import Sampler
-from .reverb import Reverb
-from .sequencer import Sequencer
+from mixer import Mixer
+from sampler import Sampler
+from sequencer import Sequencer
 
 from supriya import Server
 
-from .synth_defs import reverb, sample_player
+from synth_defs import sample_player
 
 class SupriyaStudio:
     def __init__(self) -> None:
         self.bpm = 120
-        self.quantization = '1/8'
         self.server = Server().boot()
-        self.effects = self._initialize_effects()
         self.sampler  = self._initialize_sampler()
         self.sequencer = self._initialize_sequencer()
         self.mixer = self._initialize_mixer()
-    
-    def _initialize_effects(self) -> dict[str, BaseEffect]:
-        reverb_synth =  Reverb(
-            name='reverb',
-            server=self.server,
-            synth_def=reverb,
-        )
-
-        return {reverb_synth.name: reverb_synth}
     
     def _initialize_sampler(self) -> Sampler:
         tb_303_samples_path = Path(__file__).parent / 'samples/roland_tb_303'
@@ -58,7 +46,6 @@ class SupriyaStudio:
     
     def _initialize_mixer(self) -> Mixer:
         return Mixer(
-            effects=self.effects, 
             instrument=self.sampler,
             server=self.server,
         )
@@ -67,7 +54,6 @@ class SupriyaStudio:
         return Sequencer(
             bpm=self.bpm, 
             sampler=self.sampler,
-            quantization=self.quantization,
             server=self.server,
         )
     

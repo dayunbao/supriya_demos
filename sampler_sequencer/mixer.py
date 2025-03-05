@@ -14,20 +14,16 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License 
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
-from .channel import Channel
-
 from supriya import AddAction, Bus, Group, Server
 
-from .base_effect import BaseEffect
-from .base_instrument import BaseInstrument
-from .effects_chain import EffectsChain
-from .synthdefs import main_audio_output
+from channel import Channel
+from sampler import Sampler
+from synth_defs import main_audio_output
 
 class Mixer:
     def __init__(
-        self, 
-        effects: dict[str, BaseEffect],
-        instrument: BaseInstrument, 
+        self,
+        instrument: Sampler, 
         server: Server
     ) -> None:
         self.server = server
@@ -45,10 +41,6 @@ class Mixer:
 
         self.channel_group = self.mixer_group.add_group(add_action=AddAction.ADD_TO_TAIL)
         self.channel: Channel = self._create_channel()
-
-        self.effects = effects
-        self.effects_chain_group = self.mixer_group.add_group(add_action=AddAction.ADD_TO_TAIL)
-        self.effects_chain = self._create_effects_chain()
 
         # This needs to be at the very end as all audio eventually makes its way here.
         self.main_audio_group = self.mixer_group.add_group(add_action=AddAction.ADD_TO_TAIL)
@@ -70,7 +62,7 @@ class Mixer:
             bus=self.server.add_bus(calculation_rate='audio'),
             group=self.channel_group,
             name=self.instrument.name,
-            out_bus=self.effects_chain_bus,
+            out_bus=self.main_audio_out_bus,
             server=self.server
         )
         
@@ -79,19 +71,6 @@ class Mixer:
         channel.create_synths()
         
         return channel
-    
-    def _create_effects_chain(self) -> EffectsChain:
-        effects_chain =  EffectsChain(
-            bus=self.effects_chain_bus,
-            effects=list(self.effects.values()),
-            group=self.effects_chain_group,
-            out_bus=self.main_audio_out_bus,
-            server=self.server,
-        )
-
-        effects_chain.create_synths()
-
-        return effects_chain
 
     def start_recording(self) -> None:
         self.channel.start_recording_to_disk()

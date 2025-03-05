@@ -18,7 +18,7 @@ from pathlib import Path
 
 from supriya import AddAction, Buffer, Bus, Group, Server, Synth
 
-from .synthdefs import audio_to_disk, gain, pan, parametric_equalizer
+from synth_defs import audio_to_disk, gain, pan, parametric_equalizer, reverb
 
 class Channel:
     def __init__(
@@ -37,14 +37,14 @@ class Channel:
         self.gain_synth: Synth | None = None
         self.eq_synth: Synth | None = None
         self.pan_synth: Synth | None = None
-        
+        self.reverb_synth: Synth | None = None
         # The bus that instruments send audio to.
         self.bus = bus
         self.in_bus = self.bus
         self.out_bus = out_bus
         self.eq_bus: Bus = self.server.add_bus(calculation_rate='audio')
         self.pan_bus = self.server.add_bus(calculation_rate='audio')
-        
+        self.reverb_bus = self.server.add_bus(calculation_rate='audio')
         # Recording settings
         self.BUFFER_CHANNELS = 2
         self.BUFFER_FRAME_COUNT = 262144
@@ -53,37 +53,15 @@ class Channel:
         self.audio_to_disk_synth: Synth | None = None
 
     def _add_synthdefs(self) -> None:
-        self.server.add_synthdefs(gain, pan, parametric_equalizer)
+        self.server.add_synthdefs(
+            audio_to_disk, 
+            gain, 
+            pan, 
+            parametric_equalizer, 
+            reverb
+        )
         self.server.sync()
     
-    def create_synths(self) -> None:
-        self.gain_synth = self.group.add_synth(
-            synthdef=gain, 
-            amplitude=0.01,
-            in_bus=self.in_bus,
-            out_bus = self.eq_bus,
-            add_action=AddAction.ADD_TO_TAIL,
-        )
-        
-        self.eq_synth = self.group.add_synth(
-            synthdef=parametric_equalizer,
-            frequency=1200,
-            gain=0.0,
-            resonance=1.0,
-            in_bus = self.eq_bus,
-            out_bus = self.pan_bus,
-            add_action=AddAction.ADD_TO_TAIL,
-        )
-
-        self.pan_synth = self.group.add_synth(
-            synthdef=pan,
-            in_bus = self.pan_bus,
-            out_bus = self.out_bus,
-            pan_position=-1.0,
-            add_action=AddAction.ADD_TO_TAIL,
-        )
-    
-    # RECORDING
     def _create_buffer(self) -> Buffer:
         buffer = self.server.add_buffer(
             channel_count=self.BUFFER_CHANNELS,
@@ -106,6 +84,43 @@ class Channel:
         
         return file_path
 
+    def create_synths(self) -> None:
+        self.gain_synth = self.group.add_synth(
+            synthdef=gain, 
+            amplitude=0.01,
+            in_bus=self.in_bus,
+            out_bus = self.eq_bus,
+            add_action=AddAction.ADD_TO_TAIL,
+        )
+        
+        self.eq_synth = self.group.add_synth(
+            synthdef=parametric_equalizer,
+            frequency=1200,
+            gain=0.0,
+            resonance=1.0,
+            in_bus = self.eq_bus,
+            out_bus = self.reverb_bus,
+            add_action=AddAction.ADD_TO_TAIL,
+        )
+
+        self.reverb_synth = self.group.add_synth(
+            damping=0.5,
+            in_bus=self.reverb_bus,
+            mix=0.33,
+            out_bus=self.pan_bus,
+            room_size=0.5,
+            synthdef=reverb,
+            add_action=AddAction.ADD_TO_TAIL,
+        )
+        
+        self.pan_synth = self.group.add_synth(
+            synthdef=pan,
+            in_bus = self.pan_bus,
+            out_bus = self.out_bus,
+            pan_position=-1.0,
+            add_action=AddAction.ADD_TO_TAIL,
+        )
+    
     def start_recording_to_disk(self) -> None:
         self.recording_buffer = self._create_buffer()
         self.recording_buffer.write(

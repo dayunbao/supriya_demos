@@ -16,10 +16,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 from supriya import synthdef
 from supriya.ugens import (
+    BPeakEQ,
+    CombL,
     FreeVerb,
     In,
     Limiter, 
     Out,
+    Pan2,
     PlayBuf,
 )
 from supriya.ugens.diskio import DiskOut
@@ -28,6 +31,32 @@ from supriya.ugens.diskio import DiskOut
 def audio_to_disk(in_bus, buffer_number):
     input = In.ar(bus=in_bus, channel_count=2)
     DiskOut.ar(buffer_id=buffer_number, source=input)
+
+@synthdef()
+def gain(in_bus=2, amplitude=1.0, out_bus=0):
+    signal = In.ar(bus=in_bus, channel_count=2)
+    signal *= amplitude
+    Out.ar(bus=out_bus, source=signal)
+
+@synthdef()
+def main_audio_output(amplitude=1.0, in_bus=2, out_bus=0):
+    """For the final signal that goes to the speakers."""
+    signal = In.ar(bus=in_bus, channel_count=2)
+    # signal = Limiter.ar(duration=0.005, level=1.0, source=signal)
+    signal *= amplitude
+    Out.ar(bus=out_bus, source=signal)
+
+@synthdef()
+def pan(in_bus=2, out_bus=0, pan_position=0.0):
+    signal = In.ar(bus=in_bus, channel_count=2)
+    signal = Pan2.ar(level=1.0, position=pan_position, source=signal)
+    Out.ar(bus=out_bus, source=signal)
+
+@synthdef()
+def parametric_equalizer(frequency=1200, gain=0, in_bus=2, out_bus=0, resonance=1.0):
+    signal = In.ar(bus=in_bus, channel_count=2)
+    signal = BPeakEQ.ar(frequency=frequency, gain=gain, reciprocal_of_q=resonance, source=signal)
+    Out.ar(bus=out_bus, source=signal)
 
 @synthdef()
 def reverb(

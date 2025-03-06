@@ -17,6 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 from pathlib import Path
 from typing import Optional
 
+from mido import Message
+
 from supriya import Group, Server, SynthDef
 
 from program import Program
@@ -61,10 +63,10 @@ class Sampler:
 
         return programs
 
-    def handle_midi_message(self, sampler_note: SamplerNote) -> None:
-        if sampler_note.message.type == 'control_change':
-            self._on_control_change(sampler_note=sampler_note)
-        
+    def handle_control_change_message(self, message: Message) -> None:
+        self._on_control_change(message=message)
+
+    def handle_midi_message(self, sampler_note: Message | SamplerNote) -> None:
         if sampler_note.message.type == 'note_on':
             self._on_note_on(sampler_note=sampler_note)
         
@@ -76,17 +78,17 @@ class Sampler:
         # Wait for the server to fully load the SynthDef before proceeding.
         self.server.sync()
 
-    def _on_control_change(self, sampler_note: SamplerNote) -> None:
-        if sampler_note.message.is_cc(self.sample_select_cc_num):
+    def _on_control_change(self, message: Message) -> None:
+        if message.is_cc(self.sample_select_cc_num):
             sample_number = self.scale(
-                value=sampler_note.message.value,
+                value=message.value,
                 target_min=0,
                 target_max=self.selected_program.number_samples - 1,
             )
-            self.selected_program.selected_sample = self.selected_program.buffers[sample_number]
+            self.selected_program.selected_sample = self.selected_program.set_selected_sample(sample_number=sample_number)
 
     def _on_note_on(self, sampler_note: SamplerNote) -> None:
-        buffer = self.programs[sampler_note.program].selected_sample
+        buffer = self.programs[sampler_note.program].buffers[sampler_note.sample_index]
         self.group.add_synth(
             synthdef=self._synth_definition, 
             buffer=buffer,

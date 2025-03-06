@@ -16,7 +16,8 @@ class Program:
         self._server = server
         self.buffers = self._load_buffers()
         self.number_samples = len(self.buffers)
-        self.selected_sample = self.buffers[0]
+        self.selected_sample_index = 0
+        self.selected_sample = self.buffers[self.selected_sample_index]
     
     def _load_buffers(self) -> list[Buffer]:
         buffers = []
@@ -26,4 +27,5 @@ class Program:
         return buffers
     
     def set_selected_sample(self, sample_number: int) -> Buffer:
-        self.selected_sample = self.buffers[sample_number]
+        self.selected_sample_index = sample_number
+        self.selected_sample = self.buffers[self.selected_sample_index]

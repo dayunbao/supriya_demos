@@ -14,6 +14,8 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License 
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
+from concurrent.futures import Future
+
 from mido import Message
 
 from supriya import Server
@@ -35,13 +37,14 @@ class Sequencer:
         self._clock = self._initialize_clock()
         self._clock_event_id: int | None = None
         self.sampler = sampler
-        self._SEQUENCER_STEPS: int = 16
+        self.SEQUENCER_STEPS: int = 16
         self.server = server
         self.quantization = '1/8'
         self.quantization_delta = 0.125
         self.is_recording = False
         self.tracks: list[Track] = self._initialize_tracks()
         self.playing_tracks: list[Track] = []
+        self.playing_track: Track = None
         self._track_length_in_measures = self._compute_track_length_in_measures()
         self.selected_track = self.tracks[0]
         self.midi_handler = self._initialize_midi_handler()
@@ -54,18 +57,14 @@ class Sequencer:
         
         self.tracks.append(
             Track(
-                clock=self._clock,
-                instrument=self.sampler,
-                is_recording=self.is_recording,
                 quantization_delta=self.quantization_delta,
-                sequencer_steps=self._SEQUENCER_STEPS,
-                server=self.server,
+                sequencer_steps=self.SEQUENCER_STEPS,
                 track_number=added_track_number,
             )
         )
 
     def _compute_track_length_in_measures(self) -> int:
-        return self._SEQUENCER_STEPS // int(self.quantization.split('/')[1])
+        return self.SEQUENCER_STEPS // int(self.quantization.split('/')[1])
 
     def delete_track(self, track_number: int) -> None:
         removed_track_number = self.tracks[track_number].track_number
@@ -88,20 +87,20 @@ class Sequencer:
         If recording, we only want to play the selected instrument.
         During playback, we need to play all of the instruments.
         """
-        if not self.is_recording:
-            # Just play, don't record.
-            sampler_note = SamplerNote(
-                message=message,
-                program=self.sampler.selected_program.name,
-            )
-            self.sampler.handle_midi_message(sampler_note=sampler_note)
-        else:
-            # The track will record and then send it to the instrument to play.
-            sampler_note = SamplerNote(
-                message=message,
-                program=self.sampler.selected_program.name,
-            )
-            self.selected_track.handle_midi_message(sampler_note=sampler_note)
+        if message.type == 'control_change':
+            self.sampler.handle_control_change_message(message=message)
+            return    
+        
+        sampler_note = SamplerNote(
+            message=message,
+            program=self.sampler.selected_program.name,
+            sample_index=self.sampler.selected_program.selected_sample_index,
+        )
+        
+        self.sampler.handle_midi_message(sampler_note=sampler_note)
+        
+        if self.is_recording and sampler_note.message.type == 'note_on':
+            self.selected_track.record_midi_message(sampler_note=sampler_note)
 
     def _initialize_clock(self) -> Clock:
         """Initialize the Supriya's Clock."""
@@ -117,12 +116,8 @@ class Sequencer:
         tracks =[]
         tracks.append(
             Track(
-                clock=self._clock,
-                instrument=self.sampler,
-                is_recording=self.is_recording,
                 quantization_delta=self.quantization_delta,
-                sequencer_steps=self._SEQUENCER_STEPS,
-                server=self.server,
+                sequencer_steps=self.SEQUENCER_STEPS,
                 track_number=0,
             )
         )
@@ -133,10 +128,25 @@ class Sequencer:
         self, 
         context: ClockContext, 
         delta: float, 
+        future: Future,
     ) -> tuple[float, TimeUnit] | None:
-        if context.event.invocations % self._track_length_in_measures == 0:
-            track_index = context.event.invocations // self._track_length_in_measures
-            self.start_tracks_playback(track_index=track_index)
+        track_index = 0
+        if context.event.invocations == 0:
+            self.playing_track = self.tracks[track_index]
+        
+        if (delta * (context.event.invocations + 1)) % self._track_length_in_measures == 0:
+            track_index = context.desired_moment.measure // self._track_length_in_measures
+            
+            if track_index == len(self.tracks):
+                future.set_result(True)
+                return None
+            
+            self.playing_track = self.tracks[track_index]
+
+        recorded_notes_index = delta * (context.event.invocations % self.SEQUENCER_STEPS )
+        notes: list[SamplerNote] = self.playing_track.recorded_notes[recorded_notes_index]
+        for note in notes:
+            self.sampler.handle_midi_message(sampler_note=note)
 
         return delta, TimeUnit.BEATS
 
@@ -148,15 +158,16 @@ class Sequencer:
 
     def start_playback(self) -> None:
         self._clock.start()
+        future = Future()
         self._clock_event_id = self._clock.cue(
-            kwargs={'delta': 1.0},
+            kwargs={'delta': self.quantization_delta, 'future': future},
             procedure=self.sequencer_clock_callback
         )
+        future.result()
+        self.stop_playback()
 
     def start_recording(self) -> None:
         self.is_recording = True
-        for track in self.tracks:
-            track.is_recording = self.is_recording
 
     def stop_playback(self) -> None:
         """Stop playing track."""
@@ -166,24 +177,4 @@ class Sequencer:
 
     def stop_recording(self) -> None:
         self.is_recording = False
-        for track in self.tracks:
-            track.is_recording = self.is_recording
-    
-    def start_tracks_playback(self, track_index: int) -> None:
-        print(f'Starting tracks playback at index {track_index}')
-        self.stop_tracks_playback()
-        if self.playing_tracks:
-            self.playing_tracks.clear()
-        
-        if track_index < len(self.tracks):
-            self.playing_tracks.append(self.tracks[track_index])
-        
-        if not self.playing_tracks:
-            self.stop_tracks_playback()
 
-        for track in self.playing_tracks:
-            track.start_playback()
-
-    def stop_tracks_playback(self) -> None:
-        for track in self.playing_tracks:
-            track.stop_playback()

@@ -171,6 +171,7 @@ class Sequencer:
             self.playing_track = self.tracks[track_index]
 
         recorded_notes_index = delta * (context.event.invocations % self.SEQUENCER_STEPS )
+        # Make sure we don't cause recorded_notes to grow needlessly.
         notes: list[SamplerNote] = self.playing_track.recorded_notes.get(recorded_notes_index, Rest)
         if notes is not Rest:
             for note in notes:

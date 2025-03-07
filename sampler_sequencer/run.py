@@ -102,11 +102,11 @@ def create_menu(sequencer: Sequencer, supriya_studio: SupriyaStudio) -> ConsoleM
     playback_menu_item = SubmenuItem(text='Playback', submenu=playback_menu, menu=main_menu)
 
     ####################
-    # Record Menu
+    # Sequencing Menu
     ####################
-    record_menu = ConsoleMenu(
-        title='Record', 
-        prologue_text=partial(create_record_menu_prologue, sequencer),
+    sequencing_menu = ConsoleMenu(
+        title='Sequencing', 
+        prologue_text=partial( create_sequencing_menu_prologue, sequencer),
         formatter=MenuFormatBuilder()
         .set_title_align('center')
         .set_subtitle_align('center')
@@ -116,30 +116,30 @@ def create_menu(sequencer: Sequencer, supriya_studio: SupriyaStudio) -> ConsoleM
         clear_screen=False,
     )
 
-    record_change_track_menu_item = FunctionItem(
+    sequencing_change_track_menu_item = FunctionItem(
         text='Change track',
         function=change_track,
-        kwargs={'menu': record_menu, 'sequencer': sequencer},
-        menu=record_menu,
+        kwargs={'menu': sequencing_menu, 'sequencer': sequencer},
+        menu=sequencing_menu,
     )
 
-    record_start_menu_item = FunctionItem(
+    sequencing_start_menu_item = FunctionItem(
         text='Start', 
-        function=sequencer.start_recording,
-        menu=record_menu,
+        function=sequencer.start_sequencing,
+        menu=sequencing_menu,
     )
-    record_stop_menu_item = FunctionItem(
+    sequencing_stop_menu_item = FunctionItem(
         text='Stop', 
-        function=sequencer.stop_recording,
-        menu=record_menu,
+        function=sequencer.stop_sequencing,
+        menu=sequencing_menu,
     )
 
-    record_menu.append_item(record_change_track_menu_item)
-    record_menu.append_item(record_start_menu_item)
-    record_menu.append_item(record_stop_menu_item)
-    record_menu.append_item(back_to_main_menu_item)
+    sequencing_menu.append_item(sequencing_change_track_menu_item)
+    sequencing_menu.append_item(sequencing_start_menu_item)
+    sequencing_menu.append_item(sequencing_stop_menu_item)
+    sequencing_menu.append_item(back_to_main_menu_item)
     # Add this to main_menu
-    record_menu_item = SubmenuItem(text='Record', submenu=record_menu, menu=main_menu)
+    sequencing_menu_item = SubmenuItem(text='Sequencing', submenu=sequencing_menu, menu=main_menu)
 
     ####################
     # Sequencer Menu
@@ -204,18 +204,18 @@ def create_menu(sequencer: Sequencer, supriya_studio: SupriyaStudio) -> ConsoleM
     exit_menu_item = ExitItem(text='Exit', menu=main_menu)
     
     main_menu.append_item(playback_menu_item)
-    main_menu.append_item(record_menu_item)
+    main_menu.append_item(sequencing_menu_item)
     main_menu.append_item(sequencer_menu_item)
     main_menu.append_item(tracks_menu_item)
     main_menu.append_item(exit_menu_item)
     
     return main_menu
 
-def create_record_menu_prologue(sequencer: Sequencer) -> str:
+def create_sequencing_menu_prologue(sequencer: Sequencer) -> str:
     selected_track_number = f'{sequencer.get_selected_track_number() + 1}'
-    record_menu_prologue_text = f'Selected track number: {selected_track_number}'
+    sequencing_menu_prologue_text = f'Selected track number: {selected_track_number}'
 
-    return record_menu_prologue_text
+    return sequencing_menu_prologue_text
 
 def change_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
     prompt_util = PromptUtils(screen=menu.screen)

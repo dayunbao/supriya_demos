@@ -40,7 +40,7 @@ class Sequencer:
         self.server = server
         self.QUANTIZATION = '1/8'
         self.DELTA = 0.125
-        self.is_recording = False
+        self.is_sequencing = False
         self.tracks: list[Track] = self._initialize_tracks()
         self.playing_tracks: list[Track] = []
         self.playing_track: Track = None
@@ -70,7 +70,7 @@ class Sequencer:
             self.tracks[tn].track_number = tn
 
     def exit(self) -> None:        
-        self.midi_handler.exit()
+        self.stop_playback()
 
     def get_selected_track_number(self) -> int:
         return self.selected_track.track_number
@@ -99,7 +99,7 @@ class Sequencer:
             
             self.sampler.on_note_on(sampler_note=sampler_note)
             
-            if self.is_recording:
+            if self.is_sequencing:
                 self.selected_track.record_midi_message(sampler_note=sampler_note)
     
     def handle_note_on(self, message: Message) -> None:
@@ -111,7 +111,7 @@ class Sequencer:
         
         self.sampler.on_note_on(sampler_note=sampler_note)
         
-        if self.is_recording:
+        if self.is_sequencing:
             self.selected_track.record_midi_message(sampler_note=sampler_note)
 
     def _initialize_clock(self) -> Clock:
@@ -137,7 +137,7 @@ class Sequencer:
         self, 
         context: ClockContext, 
         delta: float, 
-        future: Future,
+        playback_future: Future,
     ) -> tuple[float, TimeUnit] | None:
         track_index = 0
         if context.event.invocations == 0:
@@ -147,7 +147,7 @@ class Sequencer:
             track_index = context.desired_moment.measure // self.TRACK_LEN_IN_MEASURES
             
             if track_index == len(self.tracks):
-                future.set_result(True)
+                playback_future.set_result(True)
                 return None
             
             self.playing_track = self.tracks[track_index]
@@ -165,18 +165,15 @@ class Sequencer:
     def set_selected_track_by_track_number(self, track_number: int) -> None:
         self.selected_track = self.tracks[track_number]
 
-    def start_playback(self) -> None:
+    def start_playback(self, playback_future: Future) -> None:
         self._clock.start()
-        future = Future()
         self._clock_event_id = self._clock.cue(
-            kwargs={'delta': self.DELTA, 'future': future},
+            kwargs={'delta': self.DELTA, 'playback_future': playback_future},
             procedure=self.sequencer_clock_callback
         )
-        future.result()
-        self.stop_playback()
 
-    def start_recording(self) -> None:
-        self.is_recording = True
+    def start_sequencing(self) -> None:
+        self.is_sequencing = True
 
     def stop_playback(self) -> None:
         """Stop playing track."""
@@ -184,6 +181,6 @@ class Sequencer:
         if self._clock_event_id is not None:
             self._clock.cancel(self._clock_event_id)
 
-    def stop_recording(self) -> None:
-        self.is_recording = False
+    def stop_sequencing(self) -> None:
+        self.is_sequencing = False
 

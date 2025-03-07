@@ -14,11 +14,9 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License 
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
-from pathlib import Path
+from supriya import AddAction, Bus, Group, Server, Synth
 
-from supriya import AddAction, Buffer, Bus, Group, Server, Synth
-
-from synth_defs import audio_to_disk, gain, pan, reverb
+from synth_defs import gain, pan, reverb
 
 class Channel:
     def __init__(
@@ -47,12 +45,6 @@ class Channel:
         self.out_bus = out_bus
         self.pan_bus = self.server.add_bus(calculation_rate='audio')
         self.reverb_bus = self.server.add_bus(calculation_rate='audio')
-        # Recording settings
-        self.BUFFER_CHANNELS = 2
-        self.BUFFER_FRAME_COUNT = 262144
-        self.buffer_file_path = self._create_buffer_file_path()
-        self.recording_buffer: Buffer | None = None
-        self.audio_to_disk_synth: Synth | None = None
 
     @property
     def gain_amplitude(self) -> float:
@@ -62,7 +54,6 @@ class Channel:
     def gain_amplitude(self, gain_amplitude: float) -> None:
         self._gain_amplitude = gain_amplitude
         if self.gain_synth is not None:
-            print(f'Setting gain amplitude to {self._gain_amplitude}')
             self.group.set(amplitude=self._gain_amplitude)
 
     @property
@@ -73,7 +64,6 @@ class Channel:
     def pan_position(self, pan_position: float) -> None:
         self._pan_position = pan_position
         if self.pan_synth is not None:
-            print(f'Setting pan position to {self._pan_position}')
             self.group.set(pan_position=self._pan_position)
 
     @property
@@ -84,39 +74,15 @@ class Channel:
     def reverb_mix(self, reverb_mix: float) -> None:
         self._reverb_mix = reverb_mix
         if self.reverb_synth is not None:
-            print(f'Setting reverb mix to {self._reverb_mix}')
             self.group.set(mix=self._reverb_mix)
 
     def _add_synthdefs(self) -> None:
         self.server.add_synthdefs(
-            audio_to_disk, 
             gain, 
             pan, 
             reverb
         )
         self.server.sync()
-    
-    def _create_buffer(self) -> Buffer:
-        buffer = self.server.add_buffer(
-            channel_count=self.BUFFER_CHANNELS,
-            frame_count=self.BUFFER_FRAME_COUNT,
-        )
-
-        self.server.sync()
-
-        return buffer
-
-    def _create_buffer_file_path(self) -> Path:
-        channel_recordings_dir_path = Path(__file__).parent.parent / 'sampler_sequencer' / 'channel_recordings'
-        if not channel_recordings_dir_path.exists():
-            channel_recordings_dir_path.mkdir()
-
-        file_path =  channel_recordings_dir_path / f'{self.name}.wav'
-        
-        if not file_path.exists():
-            file_path.touch()
-        
-        return file_path
 
     def create_synths(self) -> None:
         self.gain_synth = self.group.add_synth(
@@ -143,26 +109,3 @@ class Channel:
             synthdef=reverb,
             add_action=AddAction.ADD_TO_TAIL,
         )
-    
-    def start_recording_to_disk(self) -> None:
-        self.recording_buffer = self._create_buffer()
-        self.recording_buffer.write(
-            file_path=self.buffer_file_path,
-            frame_count=0,
-            header_format='WAV',
-            leave_open=True,
-        )
-
-        self.server.sync()
-
-        self.audio_to_disk_synth = self.group.add_synth(
-            synthdef=audio_to_disk,
-            buffer_number=self.recording_buffer.id_,
-            in_bus=0, # Temporarily hardcoded, change later
-            add_action=AddAction.ADD_TO_TAIL,
-        )
-    
-    def stop_recording_to_disk(self) -> None:
-        self.audio_to_disk_synth.free()
-        self.recording_buffer.close(on_completion=lambda _: self.recording_buffer.free())
-        self.server.sync()

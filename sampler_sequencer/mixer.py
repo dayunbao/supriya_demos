@@ -14,14 +14,16 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License 
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
+from pathlib import Path
+
 from mido import Message
 
-from supriya import AddAction, Bus, Group, Server
+from supriya import AddAction, Buffer, Bus, Group, Server, Synth
 
 from channel import Channel
 from helpers import scale_float
 from sampler import Sampler
-from synth_defs import main_audio_output
+from synth_defs import audio_to_disk, main_audio_output
 
 class Mixer:
     def __init__(
@@ -32,15 +34,19 @@ class Mixer:
         self.server = server
         self._add_synthdefs()
         self.gain_amplitude_cc_num = 1
-        # self.channel_eq_cc_num = 2
         self.pan_pos_cc_num = 2
         self.channel_reverb_cc_num = 3
         self.cc_nums = [
             self.gain_amplitude_cc_num,
-            # self.channel_eq_cc_num,
             self.pan_pos_cc_num,
             self.channel_reverb_cc_num,
         ]
+        # Recording settings
+        self.BUFFER_CHANNELS = 2
+        self.BUFFER_FRAME_COUNT = 262144
+        self.buffer_file_path = self._create_buffer_file_path()
+        self.recording_buffer: Buffer | None = None
+        self.audio_to_disk_synth: Synth | None = None
         
         self.main_audio_out_bus: Bus = self.server.add_bus(calculation_rate='audio')
         self.effects_chain_bus: Bus = self.server.add_bus(calculation_rate='audio')
@@ -66,9 +72,31 @@ class Mixer:
         self.instrument.group = self.instrument_group
 
     def _add_synthdefs(self) -> None:
-        self.server.add_synthdefs(main_audio_output)
+        self.server.add_synthdefs(audio_to_disk, main_audio_output)
         self.server.sync()
     
+    def _create_buffer(self) -> Buffer:
+        buffer = self.server.add_buffer(
+            channel_count=self.BUFFER_CHANNELS,
+            frame_count=self.BUFFER_FRAME_COUNT,
+        )
+
+        self.server.sync()
+
+        return buffer
+
+    def _create_buffer_file_path(self) -> Path:
+        recordings_dir_path = Path(__file__).parent.parent / 'sampler_sequencer' / 'recordings'
+        if not recordings_dir_path.exists():
+            recordings_dir_path.mkdir()
+
+        file_path =  recordings_dir_path / 'recording.wav'
+        
+        if not file_path.exists():
+            file_path.touch()
+        
+        return file_path
+
     def _create_channel(self) -> Channel:
         channel = Channel(
             bus=self.server.add_bus(calculation_rate='audio'),
@@ -77,8 +105,7 @@ class Mixer:
             out_bus=self.main_audio_out_bus,
             server=self.server
         )
-        
-        # Put me in own method
+        # Connect the instrument's audio output to the channel.
         self.instrument.out_bus = channel.in_bus
         channel.create_synths()
         
@@ -92,14 +119,6 @@ class Mixer:
                 target_max=1.0
             )
             self.channel.gain_amplitude = scaled_gain_amplitude
-
-        # if message.is_cc(self.channel_eq_cc_num):
-        #     scaled_eq_gain = scale_float(
-        #         value=message.value,
-        #         target_min=0.0,
-        #         target_max=1.0
-        #     )
-        #     self.channel.eq_gain = scaled_eq_gain
 
         if message.is_cc(self.pan_pos_cc_num):
             scaled_pan_pos = scale_float(
@@ -118,7 +137,27 @@ class Mixer:
             self.channel.reverb_mix = scaled_reverb_mix
 
     def start_recording(self) -> None:
-        self.channel.start_recording_to_disk()
+        self.recording_buffer = self._create_buffer()
+        self.recording_buffer.write(
+            file_path=self.buffer_file_path,
+            frame_count=0,
+            header_format='WAV',
+            leave_open=True,
+        )
 
+        self.server.sync()
+
+        # Need to place this in the same group as the main audio group
+        # in order to capture the final output of the channel's processed
+        # signal. 
+        self.audio_to_disk_synth = self.main_audio_group.add_synth(
+            synthdef=audio_to_disk,
+            buffer_number=self.recording_buffer.id_,
+            in_bus=0,
+            add_action=AddAction.ADD_TO_TAIL,
+        )
+    
     def stop_recording(self) -> None:
-        self.channel.stop_recording_to_disk()
+        self.audio_to_disk_synth.free()
+        self.recording_buffer.close(on_completion=lambda _: self.recording_buffer.free())
+        self.server.sync()

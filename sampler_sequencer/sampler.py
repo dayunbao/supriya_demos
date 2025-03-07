@@ -64,6 +64,9 @@ class Sampler:
 
         return programs
 
+    def exit(self) -> None:
+        self.group.free()
+
     def _load_synth_definitions(self) -> None:
         self.server.add_synthdefs(self._synth_definition)
         # Wait for the server to fully load the SynthDef before proceeding.

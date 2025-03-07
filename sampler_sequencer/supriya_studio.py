@@ -14,6 +14,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License 
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
+from concurrent.futures import Future
 from pathlib import Path
 
 from midi_handler import MIDIHandler
@@ -83,8 +84,11 @@ class SupriyaStudio:
         )
     
     def start_playback(self) -> None:
+        playback_future = Future()
         self.mixer.start_recording()
-        self.sequencer.start_playback()
+        self.sequencer.start_playback(playback_future=playback_future)
+        playback_future.result()
+        self.stop_playback()
 
     def stop_playback(self) -> None:
         self.mixer.stop_recording()

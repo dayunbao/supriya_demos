@@ -147,6 +147,8 @@ class Sequencer:
         self.monitor_clock_callback_thread.start()
 
     def monitor_clock_callback(self) -> None:
+        """Need some way to stop the callback from outside itself,
+        and in a non-blocking way."""
         while not self.monitor_clock_callback_event.is_set():
             pass
 

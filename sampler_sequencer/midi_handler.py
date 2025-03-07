@@ -1,4 +1,5 @@
-"""
+"""A class responsible for MIDI.
+
 Copyright 2025, Andrew Clark
 
 This program is free software: you can redistribute it and/or modify 

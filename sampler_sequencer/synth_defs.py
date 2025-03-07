@@ -1,4 +1,6 @@
-"""
+"""SynthDefs used to instantiate Synths.
+
+
 Copyright 2025, Andrew Clark
 
 This program is free software: you can redistribute it and/or modify 
@@ -19,7 +21,6 @@ from supriya.ugens import (
     FreeVerb,
     In,
     Limiter, 
-    LPF,
     Out,
     Pan2,
     PlayBuf,
@@ -29,6 +30,7 @@ from supriya.ugens.diskio import DiskOut
 
 @synthdef()
 def audio_to_disk(in_bus, buffer_number):
+    """Used to write the audio to disk."""
     input = In.ar(bus=in_bus, channel_count=2)
     DiskOut.ar(buffer_id=buffer_number, source=input)
 
@@ -39,16 +41,10 @@ def gain(in_bus=2, amplitude=1.0, out_bus=0):
     ReplaceOut.ar(bus=out_bus, source=signal)
 
 @synthdef()
-def lpf(frequency=440.0, in_bus=2, out_bus=0):
-    signal = In.ar(bus=in_bus)
-    signal = LPF.ar(frequency=frequency, source=signal)
-    Out.ar(bus=out_bus, source=signal)
-
-@synthdef()
 def main_audio_output(in_bus=2, out_bus=0):
     """For the final signal that goes to the speakers."""
     signal = In.ar(bus=in_bus, channel_count=2)
-    signal = Limiter.ar(duration=0.01, level=0.5, source=signal)
+    signal = Limiter.ar(duration=0.01, level=0.1, source=signal)
     ReplaceOut.ar(bus=out_bus, source=signal)
 
 @synthdef()

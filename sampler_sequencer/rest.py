@@ -1,4 +1,5 @@
-"""
+"""A singleton used to represent a musical rest.
+
 Copyright 2025, Andrew Clark
 
 This program is free software: you can redistribute it and/or modify 

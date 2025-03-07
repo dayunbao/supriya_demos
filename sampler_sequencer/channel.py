@@ -1,4 +1,6 @@
-"""
+"""A class representing a channel on a mixer.
+
+
 Copyright 2025, Andrew Clark
 
 This program is free software: you can redistribute it and/or modify 
@@ -23,25 +25,19 @@ class Channel:
         self, 
         bus: Bus,
         group: Group, 
-        name: str,
         out_bus: Bus,
         server: Server,
     ) -> None:
         self.group = group
-        self.name = f'{name}_channel'
         self.server = server
         self._add_synthdefs()
-
+        # Defaults
         self._gain_amplitude = 0.5
         self._pan_position = 0.0
         self._reverb_mix = 0.33
-        
-        self.gain_synth: Synth | None = None
-        self.pan_synth: Synth | None = None
-        self.reverb_synth: Synth | None = None
-        # The bus that instruments send audio to.
-        self.bus = bus
-        self.in_bus = self.bus
+        # The bus that receives audio from instruments.
+        self.in_bus = bus
+        # The bus audio is sent out on after it's been fully processed by the channel.
         self.out_bus = out_bus
         self.pan_bus = self.server.add_bus(calculation_rate='audio')
         self.reverb_bus = self.server.add_bus(calculation_rate='audio')
@@ -53,8 +49,8 @@ class Channel:
     @gain_amplitude.setter
     def gain_amplitude(self, gain_amplitude: float) -> None:
         self._gain_amplitude = gain_amplitude
-        if self.gain_synth is not None:
-            self.group.set(amplitude=self._gain_amplitude)
+        # Update synth
+        self.group.set(amplitude=self._gain_amplitude)
 
     @property
     def pan_position(self) -> float:
@@ -63,8 +59,8 @@ class Channel:
     @pan_position.setter
     def pan_position(self, pan_position: float) -> None:
         self._pan_position = pan_position
-        if self.pan_synth is not None:
-            self.group.set(pan_position=self._pan_position)
+        # Update synth
+        self.group.set(pan_position=self._pan_position)
 
     @property
     def reverb_mix(self) -> float:
@@ -73,8 +69,8 @@ class Channel:
     @reverb_mix.setter
     def reverb_mix(self, reverb_mix: float) -> None:
         self._reverb_mix = reverb_mix
-        if self.reverb_synth is not None:
-            self.group.set(mix=self._reverb_mix)
+        # Update synth
+        self.group.set(mix=self._reverb_mix)
 
     def _add_synthdefs(self) -> None:
         self.server.add_synthdefs(
@@ -85,27 +81,27 @@ class Channel:
         self.server.sync()
 
     def create_synths(self) -> None:
-        self.gain_synth = self.group.add_synth(
-            synthdef=gain, 
+        self.group.add_synth(
+            add_action=AddAction.ADD_TO_TAIL,
             amplitude=self.gain_amplitude,
             in_bus=self.in_bus,
             out_bus = self.pan_bus,
-            add_action=AddAction.ADD_TO_TAIL,
+            synthdef=gain, 
         )
         
-        self.pan_synth = self.group.add_synth(
-            synthdef=pan,
+        self.group.add_synth(
+            add_action=AddAction.ADD_TO_TAIL,
             in_bus = self.pan_bus,
             out_bus = self.reverb_bus,
             pan_position=self.pan_position,
-            add_action=AddAction.ADD_TO_TAIL,
+            synthdef=pan,
         )
 
-        self.reverb_synth = self.group.add_synth(
+        self.group.add_synth(
+            add_action=AddAction.ADD_TO_TAIL,
             damping=0.5,
             in_bus=self.reverb_bus,
             mix=self._reverb_mix,
             out_bus=self.out_bus,
             synthdef=reverb,
-            add_action=AddAction.ADD_TO_TAIL,
         )

@@ -1,4 +1,5 @@
-"""
+"""Holds recorded note data for the Sequencer.
+
 Copyright 2025, Andrew Clark
 
 This program is free software: you can redistribute it and/or modify 

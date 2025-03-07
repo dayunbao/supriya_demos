@@ -1,4 +1,5 @@
-"""
+"""The driver program.
+
 Copyright 2025, Andrew Clark
 
 This program is free software: you can redistribute it and/or modify 
@@ -21,8 +22,6 @@ from consolemenu import ConsoleMenu, MenuFormatBuilder
 from consolemenu.items import FunctionItem, SubmenuItem, ExitItem
 from consolemenu.prompt_utils import PromptUtils, UserQuit
 from consolemenu.validators.base import BaseValidator
-
-from supriya import Server
 
 from sequencer import Sequencer
 from supriya_studio import SupriyaStudio
@@ -53,170 +52,6 @@ def add_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
     sequencer.add_track()
     prompt_util.println(f'Added track number: {sequencer.tracks[-1].track_number + 1}.')
 
-def create_menu(sequencer: Sequencer, supriya_studio: SupriyaStudio) -> ConsoleMenu:
-    main_menu = ConsoleMenu(
-        title='Sampler Sequencer', 
-        subtitle='Choose an option',
-        prologue_text='',
-        formatter=MenuFormatBuilder()
-        .set_title_align('center')
-        .set_subtitle_align('center')
-        .show_prologue_top_border(True),
-        show_exit_option=False,
-        clear_screen=False
-    )
-
-    ####################
-    # Shared
-    ####################
-    back_to_main_menu_item = ExitItem(text='Back to main menu', menu=main_menu)
-    
-    ####################
-    # Playback Menu
-    ####################
-    playback_menu = ConsoleMenu(
-        title='Playback', 
-        prologue_text='',
-        formatter=MenuFormatBuilder()
-        .set_title_align('center')
-        .set_subtitle_align('center')
-        .show_prologue_top_border(True),
-        show_exit_option=False,
-        clear_screen=False,
-    )
-    playback_start_menu_item = FunctionItem(
-        text='Start', 
-        function=supriya_studio.start_playback, 
-        menu=playback_menu,
-    )
-    playback_stop_menu_item = FunctionItem(
-        text='Stop', 
-        function=supriya_studio.stop_playback,
-        menu=playback_menu
-    )
-
-    playback_menu.append_item(playback_start_menu_item)
-    playback_menu.append_item(playback_stop_menu_item)
-    playback_menu.append_item(back_to_main_menu_item)
-    # Add this to main_menu
-    playback_menu_item = SubmenuItem(text='Playback', submenu=playback_menu, menu=main_menu)
-
-    ####################
-    # Sequencing Menu
-    ####################
-    sequencing_menu = ConsoleMenu(
-        title='Sequencing', 
-        prologue_text=partial( create_sequencing_menu_prologue, sequencer),
-        formatter=MenuFormatBuilder()
-        .set_title_align('center')
-        .set_subtitle_align('center')
-        .set_prologue_text_align('center')
-        .show_prologue_bottom_border(True),
-        show_exit_option=False,
-        clear_screen=False,
-    )
-
-    sequencing_change_track_menu_item = FunctionItem(
-        text='Change track',
-        function=change_track,
-        kwargs={'menu': sequencing_menu, 'sequencer': sequencer},
-        menu=sequencing_menu,
-    )
-
-    sequencing_start_menu_item = FunctionItem(
-        text='Start', 
-        function=sequencer.start_sequencing,
-        menu=sequencing_menu,
-    )
-    sequencing_stop_menu_item = FunctionItem(
-        text='Stop', 
-        function=sequencer.stop_sequencing,
-        menu=sequencing_menu,
-    )
-
-    sequencing_menu.append_item(sequencing_change_track_menu_item)
-    sequencing_menu.append_item(sequencing_start_menu_item)
-    sequencing_menu.append_item(sequencing_stop_menu_item)
-    sequencing_menu.append_item(back_to_main_menu_item)
-    # Add this to main_menu
-    sequencing_menu_item = SubmenuItem(text='Sequencing', submenu=sequencing_menu, menu=main_menu)
-
-    ####################
-    # Sequencer Menu
-    ####################
-    sequencer_menu = ConsoleMenu(
-        title='Sequencer Settings', 
-        prologue_text=partial(get_current_sequencer_settings, sequencer),
-        show_exit_option=False,
-        clear_screen=True,
-        formatter=MenuFormatBuilder()
-        .set_title_align('center')
-        .set_subtitle_align('center')
-        .set_prologue_text_align('center')
-        .show_prologue_bottom_border(True),
-    )
-    sequencer_change_bpm_menu_item = FunctionItem(
-        text='Change BPM',
-        function=get_bpm_input,
-        kwargs={'menu': sequencer_menu, 'sequencer': sequencer}
-    )
-
-    sequencer_menu.append_item(sequencer_change_bpm_menu_item)
-    sequencer_menu.append_item(back_to_main_menu_item)
-    # Add this to main_menu
-    sequencer_menu_item = SubmenuItem(text='Sequencer', submenu=sequencer_menu, menu=main_menu)
-
-    ####################
-    # Tracks Menu
-    ####################
-    tracks_menu = ConsoleMenu(
-        title='Tracks',
-        prologue_text=partial(get_current_number_of_tracks, sequencer),
-        formatter=MenuFormatBuilder()
-        .set_title_align('center')
-        .set_subtitle_align('center')
-        .set_prologue_text_align('center')
-        .show_prologue_bottom_border(True),
-        show_exit_option=False,
-        clear_screen=True,
-    )
-
-    tracks_add_menu_item = FunctionItem(
-        text='Add track', 
-        function=add_track,
-        kwargs={'menu': tracks_menu, 'sequencer': sequencer},
-    )
-    track_delete_menu_item = FunctionItem(
-        text='Delete', 
-        function=delete_track,
-        kwargs={'menu': tracks_menu, 'sequencer': sequencer},
-    )
-
-    tracks_menu.append_item(tracks_add_menu_item)
-    tracks_menu.append_item(track_delete_menu_item)
-    tracks_menu.append_item(back_to_main_menu_item)
-    # Add this to main_menu
-    tracks_menu_item = SubmenuItem(text='Tracks', submenu=tracks_menu, menu=main_menu)
-
-    ####################
-    # Main Menu
-    ####################
-    exit_menu_item = ExitItem(text='Exit', menu=main_menu)
-    
-    main_menu.append_item(playback_menu_item)
-    main_menu.append_item(sequencing_menu_item)
-    main_menu.append_item(sequencer_menu_item)
-    main_menu.append_item(tracks_menu_item)
-    main_menu.append_item(exit_menu_item)
-    
-    return main_menu
-
-def create_sequencing_menu_prologue(sequencer: Sequencer) -> str:
-    selected_track_number = f'{sequencer.get_selected_track_number() + 1}'
-    sequencing_menu_prologue_text = f'Selected track number: {selected_track_number}'
-
-    return sequencing_menu_prologue_text
-
 def change_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
     prompt_util = PromptUtils(screen=menu.screen)
     num_tracks = len(sequencer.tracks)
@@ -244,6 +79,172 @@ def change_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
     except UserQuit:
         return
 
+def create_menu(supriya_studio: SupriyaStudio) -> ConsoleMenu:
+    main_menu = ConsoleMenu(
+        title='Sampler Sequencer', 
+        subtitle='Choose an option',
+        prologue_text='',
+        formatter=MenuFormatBuilder()
+        .set_title_align('center')
+        .set_subtitle_align('center')
+        .show_prologue_top_border(True),
+        show_exit_option=False,
+        clear_screen=False
+    )
+
+    ####################
+    # Shared
+    ####################
+    back_to_main_menu_item = ExitItem(text='Back to main menu', menu=main_menu)
+    
+    ####################
+    # Playback Menu
+    ####################
+    playback_menu = ConsoleMenu(
+        title='Playback', 
+        prologue_text='',
+        formatter=MenuFormatBuilder()
+        .set_title_align('center')
+        .set_subtitle_align('center')
+        .set_prologue_text_align('center')
+        .show_prologue_top_border(True),
+        show_exit_option=False,
+        clear_screen=False,
+    )
+    playback_start_menu_item = FunctionItem(
+        text='Start', 
+        function=supriya_studio.start_playback, 
+        menu=playback_menu,
+    )
+    playback_stop_menu_item = FunctionItem(
+        text='Stop', 
+        function=supriya_studio.stop_playback,
+        menu=playback_menu
+    )
+
+    playback_menu.append_item(playback_start_menu_item)
+    playback_menu.append_item(playback_stop_menu_item)
+    playback_menu.append_item(back_to_main_menu_item)
+    # Add this to main_menu
+    playback_menu_item = SubmenuItem(text='Playback', submenu=playback_menu, menu=main_menu)
+
+    ####################
+    # Sequencing Menu
+    ####################
+    sequencing_menu = ConsoleMenu(
+        title='Sequencing', 
+        prologue_text=partial(create_sequencing_menu_prologue, supriya_studio.sequencer),
+        formatter=MenuFormatBuilder()
+        .set_title_align('center')
+        .set_subtitle_align('center')
+        .set_prologue_text_align('center')
+        .show_prologue_bottom_border(True),
+        show_exit_option=False,
+        clear_screen=False,
+    )
+
+    sequencing_change_track_menu_item = FunctionItem(
+        text='Change track',
+        function=change_track,
+        kwargs={'menu': sequencing_menu, 'sequencer': supriya_studio.sequencer},
+        menu=sequencing_menu,
+    )
+
+    sequencing_start_menu_item = FunctionItem(
+        text='Start', 
+        function=supriya_studio.sequencer.start_sequencing,
+        menu=sequencing_menu,
+    )
+    sequencing_stop_menu_item = FunctionItem(
+        text='Stop', 
+        function=supriya_studio.sequencer.stop_sequencing,
+        menu=sequencing_menu,
+    )
+
+    sequencing_menu.append_item(sequencing_change_track_menu_item)
+    sequencing_menu.append_item(sequencing_start_menu_item)
+    sequencing_menu.append_item(sequencing_stop_menu_item)
+    sequencing_menu.append_item(back_to_main_menu_item)
+    # Add this to main_menu
+    sequencing_menu_item = SubmenuItem(text='Sequencing', submenu=sequencing_menu, menu=main_menu)
+
+    ####################
+    # Sequencer Menu
+    ####################
+    sequencer_menu = ConsoleMenu(
+        title='Sequencer Settings', 
+        prologue_text=partial(get_current_sequencer_settings, supriya_studio.sequencer),
+        show_exit_option=False,
+        clear_screen=True,
+        formatter=MenuFormatBuilder()
+        .set_title_align('center')
+        .set_subtitle_align('center')
+        .set_prologue_text_align('center')
+        .show_prologue_bottom_border(True),
+    )
+    sequencer_change_bpm_menu_item = FunctionItem(
+        text='Change BPM',
+        function=get_bpm_input,
+        kwargs={'menu': sequencer_menu, 'sequencer': supriya_studio.sequencer}
+    )
+
+    sequencer_menu.append_item(sequencer_change_bpm_menu_item)
+    sequencer_menu.append_item(back_to_main_menu_item)
+    # Add this to main_menu
+    sequencer_menu_item = SubmenuItem(text='Sequencer', submenu=sequencer_menu, menu=main_menu)
+
+    ####################
+    # Tracks Menu
+    ####################
+    tracks_menu = ConsoleMenu(
+        title='Tracks',
+        prologue_text=partial(get_current_number_of_tracks, supriya_studio.sequencer),
+        formatter=MenuFormatBuilder()
+        .set_title_align('center')
+        .set_subtitle_align('center')
+        .set_prologue_text_align('center')
+        .show_prologue_bottom_border(True),
+        show_exit_option=False,
+        clear_screen=True,
+    )
+
+    tracks_add_menu_item = FunctionItem(
+        text='Add track', 
+        function=add_track,
+        kwargs={'menu': tracks_menu, 'sequencer': supriya_studio.sequencer},
+    )
+    track_delete_menu_item = FunctionItem(
+        text='Delete', 
+        function=delete_track,
+        kwargs={'menu': tracks_menu, 'sequencer': supriya_studio.sequencer},
+    )
+
+    tracks_menu.append_item(tracks_add_menu_item)
+    tracks_menu.append_item(track_delete_menu_item)
+    tracks_menu.append_item(back_to_main_menu_item)
+    # Add this to main_menu
+    tracks_menu_item = SubmenuItem(text='Tracks', submenu=tracks_menu, menu=main_menu)
+
+    ####################
+    # Main Menu
+    ####################
+    exit_menu_item = ExitItem(text='Exit', menu=main_menu)
+    
+    main_menu.append_item(playback_menu_item)
+    main_menu.append_item(sequencing_menu_item)
+    main_menu.append_item(sequencer_menu_item)
+    main_menu.append_item(tracks_menu_item)
+    main_menu.append_item(exit_menu_item)
+    
+    return main_menu
+
+def create_sequencing_menu_prologue(sequencer: Sequencer) -> str:
+    selected_track_number = f'{sequencer.get_selected_track_number() + 1}'
+    sequencing_status = 'Sequencing...' if sequencer.is_sequencing else 'Not sequencing'
+    sequencing_menu_prologue_text = f'Selected track number: {selected_track_number}\nSequencing status: {sequencing_status}'
+
+    return sequencing_menu_prologue_text
+
 def delete_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
     prompt_util = PromptUtils(screen=menu.screen)
     num_tracks = len(sequencer.tracks)
@@ -269,11 +270,9 @@ def delete_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
     except UserQuit:
         return
 
-def exit_program(supriya_studio: SupriyaStudio, server: Server) -> None:
-    """Exit the program."""
+def exit_program(supriya_studio: SupriyaStudio) -> None:
     print('Exiting Supriya Studio')
     supriya_studio.exit()
-    server.quit()
     # Calling this makes sure the SuperCollider server shuts down
     # and doesn't linger after the program exits.
     exit(0)
@@ -308,9 +307,9 @@ def get_current_sequencer_settings(sequencer: Sequencer) -> str:
 def start() -> None:
     supriya_studio = SupriyaStudio()
 
-    main_menu = create_menu(sequencer=supriya_studio.sequencer, supriya_studio=supriya_studio)
+    main_menu = create_menu(supriya_studio=supriya_studio)
     main_menu.show()
-    exit_program(supriya_studio=supriya_studio, server=supriya_studio.server)
+    exit_program(supriya_studio=supriya_studio)
 
 if __name__ == '__main__':
     start()

@@ -1,4 +1,5 @@
-"""
+"""A dataclass that holds MIDI Note On and sample data.
+
 Copyright 2025, Andrew Clark
 
 This program is free software: you can redistribute it and/or modify 
@@ -22,5 +23,5 @@ from mido import Message
 @dataclass
 class SamplerNote():
     message: Message #  The MIDI message
-    program: str #  The name of the sampler program, used to decide which sample to play
-    sample_index: int = field(default=0)
+    program: str #  The name of the program, used to decide which sample to play
+    sample_index: int = field(default=0) #  Which of the program's samples to play.

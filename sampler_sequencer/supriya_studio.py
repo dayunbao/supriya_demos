@@ -1,4 +1,5 @@
-"""
+"""A class that wraps various components .
+
 Copyright 2025, Andrew Clark
 
 This program is free software: you can redistribute it and/or modify 
@@ -33,16 +34,19 @@ class SupriyaStudio:
         self.bpm = 120
         self.server = Server().boot()
         self.sampler  = self._initialize_sampler()
-        self.sequencer = self._initialize_sequencer()
         self.mixer = self._initialize_mixer()
+        self.sequencer = self._initialize_sequencer()
         self.midi_handler = self._initialize_midi_handler()
     
     def exit(self) -> None:
+        self.sequencer.exit()
+        self.mixer.exit()
         self.midi_handler.exit()
+        self.server.quit()
 
     def handle_midi_message(self, message: Message) -> None:
         if message.type == 'control_change':
-            if message.is_cc(self.sampler.sample_select_cc_num):
+            if message.is_cc(self.sampler.SAMPLE_SELECT_CC_NUM):
                 self.sampler.on_control_change(message=message)
             
             if message.control in self.mixer.cc_nums:
@@ -62,7 +66,7 @@ class SupriyaStudio:
             name='sampler',
             samples_paths=[tb_303_samples_path, tr_909_samples_path],
             server=self.server, 
-            synth_definition=sample_player
+            synthdef=sample_player,
         )
 
         return sampler
@@ -81,15 +85,12 @@ class SupriyaStudio:
             bpm=self.bpm, 
             sampler=self.sampler,
             server=self.server,
+            start_recording_callback=self.mixer.start_recording,
+            stop_recording_callback=self.mixer.stop_recording,
         )
     
     def start_playback(self) -> None:
-        playback_future = Future()
-        self.mixer.start_recording()
-        self.sequencer.start_playback(playback_future=playback_future)
-        playback_future.result()
-        self.stop_playback()
+        self.sequencer.start_playback()
 
     def stop_playback(self) -> None:
-        self.mixer.stop_recording()
         self.sequencer.stop_playback()

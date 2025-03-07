@@ -31,7 +31,7 @@ class Sampler:
             name: str,
             samples_paths: list[Path],
             server: Server, 
-            synth_definition: SynthDef,
+            synthdef: SynthDef,
             group: Optional[Group | None]=None,
         ):
         self.group = group
@@ -39,8 +39,8 @@ class Sampler:
         self.name = name
         self.out_bus = 0
         self.server = server
-        self.sample_select_cc_num = 0
-        self._synth_definition = synth_definition
+        self.SAMPLE_SELECT_CC_NUM = 0
+        self.synthdef = synthdef
         self._load_synth_definitions()
 
         self.programs = self._create_programs(samples_paths=samples_paths)
@@ -48,6 +48,7 @@ class Sampler:
         self.selected_program = list(self.programs.values())[0]
     
     def _create_programs(self, samples_paths: list[Path]) -> dict[str, Program]:
+        """A program corresponds to a directory in the 'samples' directory."""
         programs = {}
         for number, path in enumerate(samples_paths):
             programs.update(
@@ -64,16 +65,13 @@ class Sampler:
 
         return programs
 
-    def exit(self) -> None:
-        self.group.free()
-
     def _load_synth_definitions(self) -> None:
-        self.server.add_synthdefs(self._synth_definition)
+        self.server.add_synthdefs(self.synthdef)
         # Wait for the server to fully load the SynthDef before proceeding.
         self.server.sync()
 
     def on_control_change(self, message: Message) -> None:
-        if message.is_cc(self.sample_select_cc_num):
+        if message.is_cc(self.SAMPLE_SELECT_CC_NUM):
             sample_number = scale(
                 value=message.value,
                 target_min=0,
@@ -84,12 +82,10 @@ class Sampler:
     def on_note_on(self, sampler_note: SamplerNote) -> None:
         buffer = self.programs[sampler_note.program].buffers[sampler_note.sample_index]
         self.group.add_synth(
-            synthdef=self._synth_definition, 
+            synthdef=self.synthdef, 
             buffer=buffer,
             out_bus=self.out_bus,
         )
-
-        print(self.server.dump_tree())
     
     def on_program_change(self, message: Message) -> None:
         program = scale(

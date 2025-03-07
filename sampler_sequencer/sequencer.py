@@ -21,7 +21,6 @@ from mido import Message
 from supriya import Server
 from supriya.clocks import Clock, ClockContext, TimeUnit
 
-from midi_handler import MIDIHandler
 from sampler import Sampler
 from sampler_note import SamplerNote
 from track import Track
@@ -39,15 +38,14 @@ class Sequencer:
         self.sampler = sampler
         self.SEQUENCER_STEPS: int = 16
         self.server = server
-        self.quantization = '1/8'
-        self.quantization_delta = 0.125
+        self.QUANTIZATION = '1/8'
+        self.DELTA = 0.125
         self.is_recording = False
         self.tracks: list[Track] = self._initialize_tracks()
         self.playing_tracks: list[Track] = []
         self.playing_track: Track = None
-        self._track_length_in_measures = self._compute_track_length_in_measures()
+        self.TRACK_LEN_IN_MEASURES = 2 # 1/8 * 16 = 2 measures
         self.selected_track = self.tracks[0]
-        self.midi_handler = self._initialize_midi_handler()
 
     def add_track(self) -> None:
         added_track_number = 0
@@ -57,14 +55,11 @@ class Sequencer:
         
         self.tracks.append(
             Track(
-                quantization_delta=self.quantization_delta,
+                quantization_delta=self.DELTA,
                 sequencer_steps=self.SEQUENCER_STEPS,
                 track_number=added_track_number,
             )
         )
-
-    def _compute_track_length_in_measures(self) -> int:
-        return self.SEQUENCER_STEPS // int(self.quantization.split('/')[1])
 
     def delete_track(self, track_number: int) -> None:
         removed_track_number = self.tracks[track_number].track_number
@@ -88,18 +83,35 @@ class Sequencer:
         During playback, we need to play all of the instruments.
         """
         if message.type == 'control_change':
-            self.sampler.handle_control_change_message(message=message)
-            return    
+            self.sampler.on_control_change(message=message)
+            return
         
+        if message.type == 'program_change':
+            self.sampler.on_program_change(message=message)
+            return
+        
+        if message.type == 'note_on':
+            sampler_note = SamplerNote(
+                message=message,
+                program=self.sampler.selected_program.name,
+                sample_index=self.sampler.selected_program.selected_sample_index,
+            )
+            
+            self.sampler.on_note_on(sampler_note=sampler_note)
+            
+            if self.is_recording:
+                self.selected_track.record_midi_message(sampler_note=sampler_note)
+    
+    def handle_note_on(self, message: Message) -> None:
         sampler_note = SamplerNote(
             message=message,
             program=self.sampler.selected_program.name,
             sample_index=self.sampler.selected_program.selected_sample_index,
         )
         
-        self.sampler.handle_midi_message(sampler_note=sampler_note)
+        self.sampler.on_note_on(sampler_note=sampler_note)
         
-        if self.is_recording and sampler_note.message.type == 'note_on':
+        if self.is_recording:
             self.selected_track.record_midi_message(sampler_note=sampler_note)
 
     def _initialize_clock(self) -> Clock:
@@ -109,14 +121,11 @@ class Sequencer:
 
         return clock
 
-    def _initialize_midi_handler(self) -> MIDIHandler:
-        return MIDIHandler(message_handler_callback=self.handle_midi_message)
-
     def _initialize_tracks(self) -> list[Track]:
         tracks =[]
         tracks.append(
             Track(
-                quantization_delta=self.quantization_delta,
+                quantization_delta=self.DELTA,
                 sequencer_steps=self.SEQUENCER_STEPS,
                 track_number=0,
             )
@@ -134,8 +143,8 @@ class Sequencer:
         if context.event.invocations == 0:
             self.playing_track = self.tracks[track_index]
         
-        if (delta * (context.event.invocations + 1)) % self._track_length_in_measures == 0:
-            track_index = context.desired_moment.measure // self._track_length_in_measures
+        if (delta * (context.event.invocations + 1)) % self.TRACK_LEN_IN_MEASURES == 0:
+            track_index = context.desired_moment.measure // self.TRACK_LEN_IN_MEASURES
             
             if track_index == len(self.tracks):
                 future.set_result(True)
@@ -146,7 +155,7 @@ class Sequencer:
         recorded_notes_index = delta * (context.event.invocations % self.SEQUENCER_STEPS )
         notes: list[SamplerNote] = self.playing_track.recorded_notes[recorded_notes_index]
         for note in notes:
-            self.sampler.handle_midi_message(sampler_note=note)
+            self.sampler.on_note_on(sampler_note=note)
 
         return delta, TimeUnit.BEATS
 
@@ -160,7 +169,7 @@ class Sequencer:
         self._clock.start()
         future = Future()
         self._clock_event_id = self._clock.cue(
-            kwargs={'delta': self.quantization_delta, 'future': future},
+            kwargs={'delta': self.DELTA, 'future': future},
             procedure=self.sequencer_clock_callback
         )
         future.result()

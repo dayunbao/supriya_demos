@@ -16,9 +16,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 from pathlib import Path
 
+from midi_handler import MIDIHandler
 from mixer import Mixer
 from sampler import Sampler
 from sequencer import Sequencer
+
+from mido import Message
 
 from supriya import Server
 
@@ -31,7 +34,26 @@ class SupriyaStudio:
         self.sampler  = self._initialize_sampler()
         self.sequencer = self._initialize_sequencer()
         self.mixer = self._initialize_mixer()
+        self.midi_handler = self._initialize_midi_handler()
     
+    def exit(self) -> None:
+        self.midi_handler.exit()
+
+    def handle_midi_message(self, message: Message) -> None:
+        if message.type == 'control_change':
+            if message.is_cc(self.sampler.sample_select_cc_num):
+                self.sampler.on_control_change(message=message)
+            
+            if message.control in self.mixer.cc_nums:
+                self.mixer.handle_control_change_message(message=message)
+        
+        if message.type == 'program_change':
+            self.sampler.on_program_change(message=message)
+            return
+        
+        if message.type == 'note_on':
+            self.sequencer.handle_note_on(message=message)
+
     def _initialize_sampler(self) -> Sampler:
         tb_303_samples_path = Path(__file__).parent / 'samples/roland_tb_303'
         tr_909_samples_path = Path(__file__).parent / 'samples/roland_tr_909'
@@ -44,6 +66,9 @@ class SupriyaStudio:
 
         return sampler
     
+    def _initialize_midi_handler(self) -> MIDIHandler:
+        return MIDIHandler(message_handler_callback=self.handle_midi_message)
+
     def _initialize_mixer(self) -> Mixer:
         return Mixer(
             instrument=self.sampler,

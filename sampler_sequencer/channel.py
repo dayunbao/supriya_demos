@@ -18,7 +18,7 @@ from pathlib import Path
 
 from supriya import AddAction, Buffer, Bus, Group, Server, Synth
 
-from synth_defs import audio_to_disk, gain, pan, parametric_equalizer, reverb
+from synth_defs import audio_to_disk, gain, pan, reverb
 
 class Channel:
     def __init__(
@@ -33,16 +33,18 @@ class Channel:
         self.name = f'{name}_channel'
         self.server = server
         self._add_synthdefs()
+
+        self._gain_amplitude = 0.5
+        self._pan_position = 0.0
+        self._reverb_mix = 0.33
         
         self.gain_synth: Synth | None = None
-        self.eq_synth: Synth | None = None
         self.pan_synth: Synth | None = None
         self.reverb_synth: Synth | None = None
         # The bus that instruments send audio to.
         self.bus = bus
         self.in_bus = self.bus
         self.out_bus = out_bus
-        self.eq_bus: Bus = self.server.add_bus(calculation_rate='audio')
         self.pan_bus = self.server.add_bus(calculation_rate='audio')
         self.reverb_bus = self.server.add_bus(calculation_rate='audio')
         # Recording settings
@@ -52,12 +54,44 @@ class Channel:
         self.recording_buffer: Buffer | None = None
         self.audio_to_disk_synth: Synth | None = None
 
+    @property
+    def gain_amplitude(self) -> float:
+        return self._gain_amplitude
+    
+    @gain_amplitude.setter
+    def gain_amplitude(self, gain_amplitude: float) -> None:
+        self._gain_amplitude = gain_amplitude
+        if self.gain_synth is not None:
+            print(f'Setting gain amplitude to {self._gain_amplitude}')
+            self.group.set(amplitude=self._gain_amplitude)
+
+    @property
+    def pan_position(self) -> float:
+        return self._pan_position
+    
+    @pan_position.setter
+    def pan_position(self, pan_position: float) -> None:
+        self._pan_position = pan_position
+        if self.pan_synth is not None:
+            print(f'Setting pan position to {self._pan_position}')
+            self.group.set(pan_position=self._pan_position)
+
+    @property
+    def reverb_mix(self) -> float:
+        return self._reverb_mix
+    
+    @reverb_mix.setter
+    def reverb_mix(self, reverb_mix: float) -> None:
+        self._reverb_mix = reverb_mix
+        if self.reverb_synth is not None:
+            print(f'Setting reverb mix to {self._reverb_mix}')
+            self.group.set(mix=self._reverb_mix)
+
     def _add_synthdefs(self) -> None:
         self.server.add_synthdefs(
             audio_to_disk, 
             gain, 
             pan, 
-            parametric_equalizer, 
             reverb
         )
         self.server.sync()
@@ -87,37 +121,26 @@ class Channel:
     def create_synths(self) -> None:
         self.gain_synth = self.group.add_synth(
             synthdef=gain, 
-            amplitude=0.01,
+            amplitude=self.gain_amplitude,
             in_bus=self.in_bus,
-            out_bus = self.eq_bus,
-            add_action=AddAction.ADD_TO_TAIL,
-        )
-        
-        self.eq_synth = self.group.add_synth(
-            synthdef=parametric_equalizer,
-            frequency=1200,
-            gain=0.0,
-            resonance=1.0,
-            in_bus = self.eq_bus,
-            out_bus = self.reverb_bus,
-            add_action=AddAction.ADD_TO_TAIL,
-        )
-
-        self.reverb_synth = self.group.add_synth(
-            damping=0.5,
-            in_bus=self.reverb_bus,
-            mix=0.33,
-            out_bus=self.pan_bus,
-            room_size=0.5,
-            synthdef=reverb,
+            out_bus = self.pan_bus,
             add_action=AddAction.ADD_TO_TAIL,
         )
         
         self.pan_synth = self.group.add_synth(
             synthdef=pan,
             in_bus = self.pan_bus,
-            out_bus = self.out_bus,
-            pan_position=-1.0,
+            out_bus = self.reverb_bus,
+            pan_position=self.pan_position,
+            add_action=AddAction.ADD_TO_TAIL,
+        )
+
+        self.reverb_synth = self.group.add_synth(
+            damping=0.5,
+            in_bus=self.reverb_bus,
+            mix=self._reverb_mix,
+            out_bus=self.out_bus,
+            synthdef=reverb,
             add_action=AddAction.ADD_TO_TAIL,
         )
     

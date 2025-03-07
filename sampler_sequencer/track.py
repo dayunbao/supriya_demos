@@ -79,7 +79,7 @@ class Track:
             program=sampler_note.program,
             sample_index=sampler_note.sample_index
             )
-        print(f'recorded_sampler_note = {recorded_sampler_note}')
+
         self.recorded_notes[recorded_time].append(recorded_sampler_note)
 
     # def _load_synthdef(self) -> None:

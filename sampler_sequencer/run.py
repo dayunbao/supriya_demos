@@ -269,10 +269,10 @@ def delete_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
     except UserQuit:
         return
 
-def exit_program(sequencer: Sequencer, server: Server) -> None:
+def exit_program(supriya_studio: SupriyaStudio, server: Server) -> None:
     """Exit the program."""
-    print('Exiting Sampler Sequencer')
-    sequencer.exit()
+    print('Exiting Supriya Studio')
+    supriya_studio.exit()
     server.quit()
     # Calling this makes sure the SuperCollider server shuts down
     # and doesn't linger after the program exits.
@@ -303,14 +303,14 @@ def get_current_number_of_tracks(sequencer: Sequencer) -> str:
     return prologue_text
 
 def get_current_sequencer_settings(sequencer: Sequencer) -> str:
-    return f'Current settings:\nBeats per minute(BPM) = {sequencer.bpm} * Quantization = {sequencer.quantization}'
+    return f'Current settings:\nBeats per minute(BPM) = {sequencer.bpm} * Quantization = {sequencer.QUANTIZATION}'
 
 def start() -> None:
     supriya_studio = SupriyaStudio()
 
     main_menu = create_menu(sequencer=supriya_studio.sequencer, supriya_studio=supriya_studio)
     main_menu.show()
-    exit_program(sequencer=supriya_studio.sequencer, server=supriya_studio.server)
+    exit_program(supriya_studio=supriya_studio, server=supriya_studio.server)
 
 if __name__ == '__main__':
     start()

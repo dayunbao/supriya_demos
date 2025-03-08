@@ -50,7 +50,7 @@ class TrackNumberValidator(BaseValidator):
 def add_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
     prompt_util = PromptUtils(screen=menu.screen)
     sequencer.add_track()
-    prompt_util.println(f'Added track number: {sequencer.tracks[-1].track_number + 1}.')
+    prompt_util.println(f'Added track number: {len(sequencer.tracks)}.')
 
 def change_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
     prompt_util = PromptUtils(screen=menu.screen)
@@ -73,6 +73,31 @@ def change_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
             sequencer.set_selected_track_by_track_number(
                 track_number=int(track_number) - 1
             )
+        else:    
+            prompt_util.println(f'Invalid track number provided: {track_number}')
+            return
+    except UserQuit:
+        return
+
+def copy_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
+    prompt_util = PromptUtils(screen=menu.screen)
+    num_tracks = len(sequencer.tracks)
+    track_number_validator = TrackNumberValidator(number_of_tracks=num_tracks)
+
+    prompt = 'Enter a number in the range '
+    if num_tracks > 1:
+        prompt += f'1-{num_tracks}'
+    else:
+        prompt += f'{num_tracks}'
+
+    try:
+        track_number, is_valid = prompt_util.input(
+            prompt=prompt,
+            enable_quit=True,
+            validators=[track_number_validator]
+        )
+        if is_valid:
+            sequencer.copy_track(track_number=int(track_number) - 1)
         else:    
             prompt_util.println(f'Invalid track number provided: {track_number}')
             return
@@ -213,6 +238,14 @@ def create_menu(supriya_studio: SupriyaStudio) -> ConsoleMenu:
         function=add_track,
         kwargs={'menu': tracks_menu, 'sequencer': supriya_studio.sequencer},
     )
+
+    tracks_copy_menu_item = FunctionItem(
+        text='Copy track', 
+        function=copy_track,
+        kwargs={'menu': tracks_menu, 'sequencer': supriya_studio.sequencer},
+    )
+
+
     track_delete_menu_item = FunctionItem(
         text='Delete', 
         function=delete_track,
@@ -220,6 +253,7 @@ def create_menu(supriya_studio: SupriyaStudio) -> ConsoleMenu:
     )
 
     tracks_menu.append_item(tracks_add_menu_item)
+    tracks_menu.append_item(tracks_copy_menu_item)
     tracks_menu.append_item(track_delete_menu_item)
     tracks_menu.append_item(back_to_main_menu_item)
     # Add this to main_menu

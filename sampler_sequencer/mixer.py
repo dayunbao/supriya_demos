@@ -78,14 +78,8 @@ class Mixer:
         return buffer
 
     def _create_buffer_file_path(self) -> Path:
-        recordings_dir_path = Path(__file__).parent.parent / 'sampler_sequencer' / 'recordings'
-        if not recordings_dir_path.exists():
-            recordings_dir_path.mkdir()
-
-        file_path =  recordings_dir_path / 'recording.wav'
-        
-        if not file_path.exists():
-            file_path.touch()
+        file_path = Path(__file__).parent.parent / 'sampler_sequencer' / 'recordings' / 'recording.wav'
+        file_path.touch(exist_ok=True)
         
         return file_path
 

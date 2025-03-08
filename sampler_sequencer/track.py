@@ -24,11 +24,9 @@ class Track:
             self, 
             quantization_delta: float,
             sequencer_steps: int,
-            track_number: int,
         ):
         self.quantization_delta = quantization_delta
         self.sequencer_steps =  sequencer_steps
-        self.track_number = track_number
         self.recorded_notes: dict[float, list[SamplerNote]] = defaultdict(list)
 
     def erase_recorded_notes(self) -> None:

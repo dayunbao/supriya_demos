@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 import threading
+from copy import deepcopy
 
 from mido import Message
 
@@ -58,32 +59,32 @@ class Sequencer:
         self.stop_recording_callback = stop_recording_callback
 
     def add_track(self) -> None:
-        added_track_number = 0
-        
-        if len(self.tracks) > 0:
-            added_track_number = self.tracks[-1].track_number + 1
-        
         self.tracks.append(
             Track(
                 quantization_delta=self.DELTA,
                 sequencer_steps=self.SEQUENCER_STEPS,
-                track_number=added_track_number,
             )
         )
 
-    def delete_track(self, track_number: int) -> None:
-        removed_track_number = self.tracks[track_number].track_number
-        del self.tracks[track_number]
-        num_tracks = len(self.tracks)
+    def copy_track(self, track_number: int) -> None:
+        track_to_copy = self.tracks[track_number]
+        new_track = deepcopy(track_to_copy)
+        self.tracks.append(new_track)
 
-        for tn in range(removed_track_number, num_tracks):
-            self.tracks[tn].track_number = tn
+    def delete_track(self, track_number: int) -> None:
+        del self.tracks[track_number]
+        
+        if len(self.tracks) == 0:
+            self.add_track()
+        
+        self.selected_track = self.tracks[-1]
 
     def exit(self) -> None:        
         self.stop_playback()
 
     def get_selected_track_number(self) -> int:
-        return self.selected_track.track_number
+        index = self.tracks.index(self.selected_track)
+        return index
 
     def handle_midi_message(self, message: Message) -> None:
         """
@@ -136,7 +137,6 @@ class Sequencer:
             Track(
                 quantization_delta=self.DELTA,
                 sequencer_steps=self.SEQUENCER_STEPS,
-                track_number=0,
             )
         )
         

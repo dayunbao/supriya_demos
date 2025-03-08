@@ -44,7 +44,7 @@ def gain(in_bus=2, amplitude=1.0, out_bus=0):
 def main_audio_output(in_bus=2, out_bus=0):
     """For the final signal that goes to the speakers."""
     signal = In.ar(bus=in_bus, channel_count=2)
-    signal = Limiter.ar(duration=0.01, level=0.1, source=signal)
+    signal = Limiter.ar(duration=0.01, level=0.5, source=signal)
     ReplaceOut.ar(bus=out_bus, source=signal)
 
 @synthdef()

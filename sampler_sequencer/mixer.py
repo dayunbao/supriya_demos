@@ -78,6 +78,7 @@ class Mixer:
 
     def _create_buffer_file_path(self) -> Path:
         file_path = Path(__file__).parent.parent / 'sampler_sequencer' / 'recordings' / 'recording.wav'
+        # Make sure we're staring with a few file each time.
         file_path.unlink(missing_ok=True)
         file_path.touch(exist_ok=True)
         

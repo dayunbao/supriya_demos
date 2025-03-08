@@ -45,7 +45,6 @@ class Mixer:
         # Recording settings
         self.BUFFER_CHANNELS = 2
         self.BUFFER_FRAME_COUNT = 262144
-        self.buffer_file_path = self._create_buffer_file_path()
         self.recording_buffer: Buffer | None = None
         self.audio_to_disk_synth: Synth | None = None
         # Create the groups and buses needed.
@@ -79,6 +78,7 @@ class Mixer:
 
     def _create_buffer_file_path(self) -> Path:
         file_path = Path(__file__).parent.parent / 'sampler_sequencer' / 'recordings' / 'recording.wav'
+        file_path.unlink(missing_ok=True)
         file_path.touch(exist_ok=True)
         
         return file_path
@@ -126,8 +126,9 @@ class Mixer:
 
     def start_recording(self) -> None:
         self.recording_buffer = self._create_buffer()
+        buffer_file_path = self._create_buffer_file_path()
         self.recording_buffer.write(
-            file_path=self.buffer_file_path,
+            file_path=buffer_file_path,
             frame_count=0,
             header_format='WAV',
             leave_open=True,

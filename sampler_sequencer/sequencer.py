@@ -43,6 +43,7 @@ class Sequencer:
         self.DELTA = 0.125
         self.QUANTIZATION = '1/8'
         self.is_sequencing = False
+        self.playback_track_index = 0
         self.playing_tracks: list[Track] = []
         self.playing_track: Track = None
         self.sampler = sampler
@@ -159,18 +160,14 @@ class Sequencer:
         context: ClockContext, 
         delta: float, 
     ) -> tuple[float, TimeUnit] | None:
-        track_index = 0
-        if context.event.invocations == 0:
-            self.playing_track = self.tracks[track_index]
-        
-        if (delta * (context.event.invocations + 1)) % self.TRACK_LEN_IN_MEASURES == 0:
-            track_index = context.desired_moment.measure // self.TRACK_LEN_IN_MEASURES
-            
-            if track_index == len(self.tracks):
+        if context.event.invocations % self.SEQUENCER_STEPS == 0:
+            if self.playback_track_index == len(self.tracks):
                 self.monitor_clock_callback_event.set()
                 return None
             
-            self.playing_track = self.tracks[track_index]
+            self.playing_track = self.tracks[self.playback_track_index]
+            self.playback_track_index += 1
+                    
 
         recorded_notes_index = delta * (context.event.invocations % self.SEQUENCER_STEPS )
         # Make sure we don't cause recorded_notes to grow needlessly.
@@ -200,7 +197,9 @@ class Sequencer:
     def stop_playback(self) -> None:
         if self.clock.is_running:
             self.stop_recording_callback()
-            self.monitor_clock_callback_event.set()
+            self.playback_track_index = 0
+            if not self.monitor_clock_callback_event.is_set():
+                self.monitor_clock_callback_event.set()
             if self.clock_event_id is not None:
                 self.clock.cancel(self.clock_event_id)
                 self.clock.stop()

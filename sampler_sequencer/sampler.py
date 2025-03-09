@@ -48,7 +48,7 @@ class Sampler:
         self.selected_program = list(self.programs.values())[0]
     
     def _create_programs(self, samples_paths: list[Path]) -> dict[str, Program]:
-        """A program corresponds to a directory in the 'samples' directory."""
+        """A program corresponds to a directory in the 'samples/' directory."""
         programs = {}
         for number, path in enumerate(samples_paths):
             programs.update(
@@ -71,13 +71,12 @@ class Sampler:
         self.server.sync()
 
     def on_control_change(self, message: Message) -> None:
-        if message.is_cc(self.SAMPLE_SELECT_CC_NUM):
-            sample_number = scale(
-                value=message.value,
-                target_min=0,
-                target_max=self.selected_program.number_samples - 1,
-            )
-            self.selected_program.selected_sample = self.selected_program.set_selected_sample(sample_number=sample_number)
+        sample_number = scale(
+            value=message.value,
+            target_min=0,
+            target_max=self.selected_program.number_samples - 1,
+        )
+        self.selected_program.selected_sample = self.selected_program.set_selected_sample(sample_number=sample_number)
 
     def on_note_on(self, sampler_note: SamplerNote) -> None:
         buffer = self.programs[sampler_note.program].buffers[sampler_note.sample_index]

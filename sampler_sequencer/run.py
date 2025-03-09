@@ -114,7 +114,6 @@ def create_menu(supriya_studio: SupriyaStudio) -> ConsoleMenu:
         .set_subtitle_align('center')
         .show_prologue_top_border(True),
         show_exit_option=False,
-        clear_screen=False
     )
 
     ####################
@@ -134,7 +133,6 @@ def create_menu(supriya_studio: SupriyaStudio) -> ConsoleMenu:
         .set_prologue_text_align('center')
         .show_prologue_top_border(True),
         show_exit_option=False,
-        clear_screen=False,
     )
     playback_start_menu_item = FunctionItem(
         text='Start', 
@@ -165,7 +163,6 @@ def create_menu(supriya_studio: SupriyaStudio) -> ConsoleMenu:
         .set_prologue_text_align('center')
         .show_prologue_bottom_border(True),
         show_exit_option=False,
-        clear_screen=False,
     )
 
     sequencing_change_track_menu_item = FunctionItem(
@@ -252,9 +249,16 @@ def create_menu(supriya_studio: SupriyaStudio) -> ConsoleMenu:
         kwargs={'menu': tracks_menu, 'sequencer': supriya_studio.sequencer},
     )
 
+    track_erase_menu_item = FunctionItem(
+        text='Erase', 
+        function=erase_track,
+        kwargs={'menu': tracks_menu, 'sequencer': supriya_studio.sequencer},
+    )
+
     tracks_menu.append_item(tracks_add_menu_item)
     tracks_menu.append_item(tracks_copy_menu_item)
     tracks_menu.append_item(track_delete_menu_item)
+    tracks_menu.append_item(track_erase_menu_item)
     tracks_menu.append_item(back_to_main_menu_item)
     # Add this to main_menu
     tracks_menu_item = SubmenuItem(text='Tracks', submenu=tracks_menu, menu=main_menu)
@@ -304,6 +308,31 @@ def delete_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
     except UserQuit:
         return
 
+def erase_track(menu: ConsoleMenu, sequencer: Sequencer) -> None:
+    prompt_util = PromptUtils(screen=menu.screen)
+    num_tracks = len(sequencer.tracks)
+    track_delete_validator = TrackNumberValidator(number_of_tracks=num_tracks)
+
+    prompt = 'Enter a number in the range '
+    if num_tracks > 1:
+        prompt += f'1-{num_tracks}'
+    else:
+        prompt += f'{num_tracks}'
+
+    try:
+        track_number, is_valid = prompt_util.input(
+            prompt=prompt,
+            enable_quit=True,
+            validators=[track_delete_validator]
+        )
+        if is_valid:
+            sequencer.erase_track(track_number=int(track_number) - 1)
+        else:    
+            prompt_util.println(f'Invalid track number provided: {track_number}')
+            return
+    except UserQuit:
+        return
+
 def exit_program(supriya_studio: SupriyaStudio) -> None:
     print('Exiting Supriya Studio')
     supriya_studio.exit()
@@ -336,7 +365,7 @@ def get_current_number_of_tracks(sequencer: Sequencer) -> str:
     return prologue_text
 
 def get_current_sequencer_settings(sequencer: Sequencer) -> str:
-    return f'Current settings:\nBeats per minute(BPM) = {sequencer.bpm} * Quantization = {sequencer.QUANTIZATION}'
+    return f'Beats per minute(BPM): {sequencer.bpm}'
 
 def start() -> None:
     supriya_studio = SupriyaStudio()

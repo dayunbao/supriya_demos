@@ -71,6 +71,10 @@ class Sequencer:
         track_to_copy = self.tracks[track_number]
         new_track = deepcopy(track_to_copy)
         self.tracks.append(new_track)
+    
+    def _create_monitor_clock_callback_thread(self) -> None:
+        self.monitor_clock_callback_thread = threading.Thread(target=self._monitor_clock_callback, daemon=True)
+        self.monitor_clock_callback_thread.start()
 
     def delete_track(self, track_number: int) -> None:
         del self.tracks[track_number]
@@ -79,6 +83,9 @@ class Sequencer:
             self.add_track()
         
         self.selected_track = self.tracks[-1]
+
+    def erase_track(self, track_number: int) -> None:
+        self.tracks[track_number].erase_recorded_notes()
 
     def exit(self) -> None:        
         self.stop_playback()
@@ -143,11 +150,7 @@ class Sequencer:
         
         return tracks
 
-    def create_monitor_clock_callback_thread(self) -> None:
-        self.monitor_clock_callback_thread = threading.Thread(target=self.monitor_clock_callback, daemon=True)
-        self.monitor_clock_callback_thread.start()
-
-    def monitor_clock_callback(self) -> None:
+    def _monitor_clock_callback(self) -> None:
         """Need some way to stop the callback from outside itself,
         and in a non-blocking way."""
         while not self.monitor_clock_callback_event.is_set():
@@ -184,7 +187,7 @@ class Sequencer:
     def start_playback(self) -> None:
         if len(self.tracks) >= 1 and len(self.tracks[0].recorded_notes.keys()) > 0:
             self.start_recording_callback()
-            self.create_monitor_clock_callback_thread()
+            self._create_monitor_clock_callback_thread()
             self.clock.start()
             self.clock_event_id = self.clock.cue(
                 kwargs={'delta': self.DELTA},

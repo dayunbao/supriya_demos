@@ -15,7 +15,6 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License 
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
-from concurrent.futures import Future
 from pathlib import Path
 
 from midi_handler import MIDIHandler

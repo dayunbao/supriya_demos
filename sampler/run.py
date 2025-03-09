@@ -114,6 +114,7 @@ def create_menu(supriya_studio: SupriyaStudio) -> ConsoleMenu:
         .set_subtitle_align('center')
         .show_prologue_top_border(True),
         show_exit_option=False,
+        clear_screen=False,
     )
 
     ####################
@@ -133,6 +134,7 @@ def create_menu(supriya_studio: SupriyaStudio) -> ConsoleMenu:
         .set_prologue_text_align('center')
         .show_prologue_top_border(True),
         show_exit_option=False,
+        clear_screen=False,
     )
     playback_start_menu_item = FunctionItem(
         text='Start', 

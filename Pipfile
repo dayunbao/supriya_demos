@@ -7,9 +7,9 @@ name = "pypi"
 supriya = "*"
 ruff = "*"
 mypy = "*"
+console-menu = "*"
 mido = "*"
 python-rtmidi = "*"
-console-menu = "*"
 
 [dev-packages]
 

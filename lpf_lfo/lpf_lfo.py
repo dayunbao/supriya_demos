@@ -36,7 +36,7 @@ from supriya.ugens import (
 )
 
 @synthdef()
-def filter(in_bus=2, lfo_rate=1, resonance=0.05, out_bus=0):
+def filter(in_bus=2, lfo_rate=1, resonance=0.05, out_bus=0) -> None:
     signal = In.ar(bus=in_bus, channel_count=2)
     # A sine wave LFO. 
     # Setting phase to 1.5 * pi starts it from the bottom of the sine wave.
@@ -59,7 +59,7 @@ def reverb(
     room_size=0.5,
     damping=0.5,
     out_bus=0,
-):
+) -> None:
     signal = In.ar(bus=in_bus)
     signal = FreeVerb.ar(source=signal, mix=mix, room_size=room_size, damping=damping)
     signal = Pan2.ar(source=signal, position=0.0)

@@ -63,7 +63,7 @@ def reverb(
     signal = In.ar(bus=in_bus)
     signal = FreeVerb.ar(source=signal, mix=mix, room_size=room_size, damping=damping)
     signal = Pan2.ar(source=signal, position=0.0)
-    signal = Limiter.ar(duration=0.01, level=0.5, source=signal)
+    signal = Limiter.ar(duration=0.01, level=0.1, source=signal)
     ReplaceOut.ar(bus=out_bus, source=signal)
 
 @synthdef()

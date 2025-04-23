@@ -10,6 +10,8 @@ mypy = "*"
 console-menu = "*"
 mido = "*"
 python-rtmidi = "*"
+librosa = "*"
+matplotlib = "*"
 
 [dev-packages]
 

@@ -540,7 +540,7 @@ def algorithm_8(
     carrier_ratio_2 = ratio * 2
     carrier_ratio_3 = ratio * 4 
     carrier_ratio_4 = ratio * 8 
-    feedback_index = IRand.ir(minimum=10000, maximum=15000)
+    feedback_index = IRand.ir(minimum=500, maximum=1500)
 
     envelope_1 = EnvGen.kr(
         envelope=Envelope.adsr(
@@ -612,7 +612,7 @@ def algorithm_8(
     Out.ar(bus=0, source=pan)
 
 def main() -> None:
-    server = Server().boot(block_size=1)
+    server = Server().boot()
     server.add_synthdefs(algorithm_1, algorithm_2, algorithm_8)
     server.sync()
 
@@ -632,6 +632,7 @@ def main() -> None:
         curve_1=(-32),
         curve_2=(-16),
         curve_3=(-8),
+        feedback_index=0.0,
         modulation_index_2=RandomPattern(minimum=6.0, maximum=12.0),
         modulation_index_3=RandomPattern(minimum=6.0, maximum=12.0),
     )

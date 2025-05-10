@@ -594,7 +594,6 @@ def algorithm_8(
 
 def main() -> None:
     server = Server().boot(block_size=1)
-
     server.add_synthdefs(algorithm_1, algorithm_2, algorithm_8)
     server.sync()
 
@@ -618,12 +617,12 @@ def main() -> None:
         modulation_index_3=RandomPattern(minimum=6.0, maximum=12.0),
     )
 
-    minor_scale_arp = [0, 3, 7, 10, 5, 7, 3]
-    note = 41 # F2
-    arp_frequencies = [midi_note_number_to_frequency(n + note) for n in minor_scale_arp]
-    arpeggiator_sequence = SequencePattern(arp_frequencies, iterations=None)
-    arpeggiator_pattern = EventPattern(
-        frequency=arpeggiator_sequence,
+    minor_scale_arpeggio = [0, 3, 7, 10, 5, 7, 3]
+    arpeggio_note = 41 # F2
+    arpeggio_frequencies = [midi_note_number_to_frequency(n + arpeggio_note) for n in minor_scale_arpeggio]
+    arpeggio_sequence = SequencePattern(arpeggio_frequencies, iterations=None)
+    arpeggio_pattern = EventPattern(
+        frequency=arpeggio_sequence,
         synthdef=algorithm_2,
         delta=0.0625, # 16th note
         duration=0.0625, # 16th note
@@ -658,7 +657,7 @@ def main() -> None:
     clock = Clock()
     clock.start(beats_per_minute=80.0)
     bass_pattern.play(clock=clock, context=server)
-    arpeggiator_pattern.play(clock=clock, context=server)
+    arpeggio_pattern.play(clock=clock, context=server)
     pad_pattern.play(clock=clock, context=server)
 
     while True:

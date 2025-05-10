@@ -599,14 +599,14 @@ def main() -> None:
     server.sync()
 
     minor_scale_bass = [0, 3, 10, 7]
-    bass_note = 29
+    bass_note = 29 # F1
     bass_frequencies = [midi_note_number_to_frequency(n + bass_note) for n in minor_scale_bass]
     bass_sequence = SequencePattern(bass_frequencies, iterations=None)
     bass_pattern = EventPattern(
         frequency=bass_sequence,
         synthdef=algorithm_1,
-        delta=0.5,
-        duration=0.55,
+        delta=0.5, # Half note
+        duration=0.5, # Half note
         adsr_1=(0.01, 0.9, 0.0, 0.0),
         adsr_2=(0.01, 0.5, 0.0, 0.0),
         adsr_3=(0.01, 0.5, 0.0, 0.0),
@@ -619,14 +619,14 @@ def main() -> None:
     )
 
     minor_scale_arp = [0, 3, 7, 10, 5, 7, 3]
-    note = 41
+    note = 41 # F2
     arp_frequencies = [midi_note_number_to_frequency(n + note) for n in minor_scale_arp]
     arpeggiator_sequence = SequencePattern(arp_frequencies, iterations=None)
     arpeggiator_pattern = EventPattern(
         frequency=arpeggiator_sequence,
         synthdef=algorithm_2,
-        delta=0.0625,
-        duration=0.0625,
+        delta=0.0625, # 16th note
+        duration=0.0625, # 16th note
         amplitude=0.09,
         curve_1=(-16),
         curve_2=(-8),
@@ -635,15 +635,15 @@ def main() -> None:
         modulation_index_4=RandomPattern(minimum=1.0, maximum=8.0),
     )
 
-    minor_scale_lead = [7, 0, 3, 10]
-    note = 53
-    lead_frequencies = [midi_note_number_to_frequency(n + note) for n in minor_scale_lead]
-    lead_sequence = SequencePattern(lead_frequencies, iterations=None)
-    lead_pattern = EventPattern(
-        frequency=lead_sequence,
+    minor_scale_pad = [7, 0, 3, 10]
+    pad_note = 53 # F3
+    pad_frequencies = [midi_note_number_to_frequency(n + pad_note) for n in minor_scale_pad]
+    pad_sequence = SequencePattern(pad_frequencies, iterations=None)
+    pad_pattern = EventPattern(
+        frequency=pad_sequence,
         synthdef=algorithm_8,
-        delta=1.0,
-        duration=1.0,
+        delta=1.0, # Whole note
+        duration=1.0, # Whole note
         adsr_1=(0.01, 0.7, 0.1, 0.5),
         adsr_2=(0.7, 0.6, 0.08, 0.9),
         adsr_3=(0.5, 0.5, 0.05, 1.0),
@@ -659,7 +659,7 @@ def main() -> None:
     clock.start(beats_per_minute=80.0)
     bass_pattern.play(clock=clock, context=server)
     arpeggiator_pattern.play(clock=clock, context=server)
-    lead_pattern.play(clock=clock, context=server)
+    pad_pattern.play(clock=clock, context=server)
 
     while True:
         continue

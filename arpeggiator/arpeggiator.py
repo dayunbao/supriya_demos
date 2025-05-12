@@ -150,6 +150,7 @@ def start(chord: str, direction: str) -> None:
     arpeggiator_pattern = create_arpeggiator(arpeggiator_sequence=arpeggiator_sequence)
     server = initialize()
     clock = Clock()
+    clock.start(beats_per_minute=160)
     play_arpeggiator(arpeggiator_pattern=arpeggiator_pattern, clock=clock, server=server)
 
     while True:

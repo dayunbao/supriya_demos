@@ -685,15 +685,27 @@ def main() -> None:
     )
     server.sync()
 
-    # [ 0,  2,  3,  5,  7,  8,  10 ]
-    # [ 12, 14, 15, 17, 19, 20, 22 ]
+    # Bass
     bass_note = 27
     bass_scale = [0, 3, 8, 12, 3, 7, 10, 14]
     bass_frequencies = [midi_note_number_to_frequency(n + bass_note) for n in bass_scale]
     bass_sequence = SequencePattern(bass_frequencies, iterations=None)
 
+    algorithm_4_pattern = EventPattern(
+        frequency=bass_sequence,
+        synthdef=algorithm_4,
+        delta=0.25,
+        duration=0.25,
+        adsr_1=(0.01, 0.5, 0.01, 0.01),
+        adsr_2=(0.01, 0.5, 0.01, 0.01),
+        adsr_3=(0.01, 0.5, 0.01, 0.01),
+        amplitude=0.25,
+        feedback_index=3.832276,
+        phase_index_2=0.197109,
+        phase_index_3=2.11338,
+    )
 
-    # minor_scale_arpeggio = [0, 3, 7, 10, 5, 7, 3]
+    # Arpeggio
     minor_scale_arpeggio = [
         0, 3, 7, 10, 
         7, 3, 0, 10, 
@@ -705,9 +717,20 @@ def main() -> None:
         14, 10, 20, 17,
     ]
     arpeggio_note = 51
+    
     arpeggio_frequencies = [midi_note_number_to_frequency(n + arpeggio_note) for n in minor_scale_arpeggio]
     arpeggio_sequence = SequencePattern(arpeggio_frequencies, iterations=None)
 
+    algorithm_6_pattern = EventPattern(
+        frequency=arpeggio_sequence,
+        synthdef=algorithm_6,
+        delta=0.0625,
+        duration=0.0625,
+        amplitude=0.2,
+        feedback_index=RandomPattern(minimum=0.0, maximum=15.0),
+    )
+
+    # Pad
     pad_sequence = SequencePattern(
         [
             [
@@ -738,29 +761,6 @@ def main() -> None:
         iterations=None,
     )
 
-    algorithm_4_pattern = EventPattern(
-        frequency=bass_sequence,
-        synthdef=algorithm_4,
-        delta=0.25,
-        duration=0.25,
-        adsr_1=(0.01, 0.5, 0.01, 0.01),
-        adsr_2=(0.01, 0.5, 0.01, 0.01),
-        adsr_3=(0.01, 0.5, 0.01, 0.01),
-        amplitude=0.25,
-        feedback_index=3.832276,
-        phase_index_2=0.197109,
-        phase_index_3=2.11338,
-    )
-
-    algorithm_6_pattern = EventPattern(
-        frequency=arpeggio_sequence,
-        synthdef=algorithm_6,
-        delta=0.0625,
-        duration=0.0625,
-        amplitude=0.2,
-        feedback_index=RandomPattern(minimum=0.0, maximum=15.0),
-    )
-
     algorithm_7_pattern = EventPattern(
         frequency=pad_sequence,
         synthdef=algorithm_7,
@@ -778,7 +778,7 @@ def main() -> None:
 
     clock = Clock()
     clock.start(beats_per_minute=40.0)
-    
+    # Make sure all patterns start at the same time (the downbeat of the next quarter note.)
     algorithm_4_pattern.play(clock=clock, context=server, quantization='1/4')
     algorithm_6_pattern.play(clock=clock, context=server, quantization='1/4')
     algorithm_7_pattern.play(clock=clock, context=server, quantization='1/4')

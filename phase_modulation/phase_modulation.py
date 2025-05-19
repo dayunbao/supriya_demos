@@ -1,3 +1,22 @@
+"""A script demonstrating how to do phase modulation synthesis and build algorithms.
+
+
+Copyright 2025, Andrew Clark
+
+This program is free software: you can redistribute it and/or modify 
+it under the terms of the GNU General Public License as published by 
+the Free Software Foundation, either version 3 of the License, or 
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful, 
+but WITHOUT ANY WARRANTY; without even the implied warranty of 
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the 
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License 
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+"""
+
 import sys
 from math import pi
 
@@ -251,8 +270,8 @@ def algorithm_3(
 ) -> None:
     ratio = IRand.ir(minimum=1, maximum=2)
     carrier_ratio = ratio
-    modulator_ratio_2 = ratio * 4
-    modulator_ratio_3 = ratio * 2
+    modulator_ratio_2 = ratio + 4
+    modulator_ratio_3 = ratio + 2
     modulator_ratio_4 = ratio + 1
 
     modulator_3 = phase_modulation_operator(
@@ -288,7 +307,7 @@ def algorithm_3(
         modulator=modulator_2 + modulator_4,
         ratio=carrier_ratio,
     )
-    carrier = FreeVerb.ar(source=carrier, mix=0.55, room_size=0.75, damping=0.5)
+    carrier = FreeVerb.ar(source=carrier, mix=0.55, room_size=0.65, damping=0.5)
     carrier = CombL.ar(
         delay_time=0.2,
         decay_time=2.0,
@@ -358,13 +377,7 @@ def algorithm_4(
         modulator=modulator_2 + modulator_3,
         ratio=carrier_ratio,
     )
-    carrier = FreeVerb.ar(source=carrier, mix=0.55, room_size=0.75, damping=0.5)
-    carrier = CombL.ar(
-        delay_time=0.2,
-        decay_time=2.0,
-        maximum_delay_time=0.2, 
-        source=carrier
-    )
+    carrier = FreeVerb.ar(source=carrier, mix=0.55, room_size=0.65, damping=0.5)
     
     pan = Pan2.ar(source=carrier, position=0.0, level=amplitude)
     Out.ar(bus=0, source=pan)    
@@ -568,7 +581,7 @@ def algorithm_7(
 
     output = carrier_1 + carrier_2 + carrier_3
 
-    output = FreeVerb.ar(source=output, mix=0.55, room_size=0.75, damping=0.5)
+    output = FreeVerb.ar(source=output, mix=0.75, room_size=0.75, damping=0.5)
     output = CombL.ar(
         delay_time=0.2,
         decay_time=4.0,
@@ -665,19 +678,32 @@ def algorithm_8(
 
 def main() -> None:
     server = Server().boot(block_size=1)
-    server.add_synthdefs(
-        algorithm_1, 
-        algorithm_2, 
-        algorithm_3, 
+    server.add_synthdefs( 
         algorithm_4,
-        algorithm_5,
         algorithm_6,
         algorithm_7,
-        algorithm_8,
     )
     server.sync()
 
-    minor_scale_arpeggio = [0, 3, 7, 10, 5, 7, 3]
+    # [ 0,  2,  3,  5,  7,  8,  10 ]
+    # [ 12, 14, 15, 17, 19, 20, 22 ]
+    bass_note = 27
+    bass_scale = [0, 3, 8, 12, 3, 7, 10, 14]
+    bass_frequencies = [midi_note_number_to_frequency(n + bass_note) for n in bass_scale]
+    bass_sequence = SequencePattern(bass_frequencies, iterations=None)
+
+
+    # minor_scale_arpeggio = [0, 3, 7, 10, 5, 7, 3]
+    minor_scale_arpeggio = [
+        0, 3, 7, 10, 
+        7, 3, 0, 10, 
+        8, 12, 15, 19, 
+        8, 19, 15, 12, 
+        3, 7, 12, 15, 
+        12, 7, 3, 15, 
+        10, 14, 17, 20, 
+        14, 10, 20, 17,
+    ]
     arpeggio_note = 51
     arpeggio_frequencies = [midi_note_number_to_frequency(n + arpeggio_note) for n in minor_scale_arpeggio]
     arpeggio_sequence = SequencePattern(arpeggio_frequencies, iterations=None)
@@ -687,125 +713,51 @@ def main() -> None:
             [
                 midi_note_number_to_frequency(arpeggio_note + 0),
                 midi_note_number_to_frequency(arpeggio_note + 3),
-                midi_note_number_to_frequency(arpeggio_note + 7)
+                midi_note_number_to_frequency(arpeggio_note + 7),
+                midi_note_number_to_frequency(arpeggio_note + 10),
             ],
             [
-                midi_note_number_to_frequency(arpeggio_note + 0 + 5),
-                midi_note_number_to_frequency(arpeggio_note + 3 + 5),
-                midi_note_number_to_frequency(arpeggio_note + 7 + 5)
+                midi_note_number_to_frequency(arpeggio_note + 8),
+                midi_note_number_to_frequency(arpeggio_note + 12),
+                midi_note_number_to_frequency(arpeggio_note + 15),
+                midi_note_number_to_frequency(arpeggio_note + 19),
             ],
             [
-                midi_note_number_to_frequency(arpeggio_note + 0 + 7),
-                midi_note_number_to_frequency(arpeggio_note + 3 + 7),
-                midi_note_number_to_frequency(arpeggio_note + 7 + 7)
+                midi_note_number_to_frequency(arpeggio_note + 3),
+                midi_note_number_to_frequency(arpeggio_note + 7),
+                midi_note_number_to_frequency(arpeggio_note + 12),
+                midi_note_number_to_frequency(arpeggio_note + 15),
+            ],
+            [
+                midi_note_number_to_frequency(arpeggio_note + 10),
+                midi_note_number_to_frequency(arpeggio_note + 14),
+                midi_note_number_to_frequency(arpeggio_note + 17),
+                midi_note_number_to_frequency(arpeggio_note + 20),
             ],
         ], 
         iterations=None,
     )
-    
-    arpeggio_pattern_1 = EventPattern(
-        frequency=arpeggio_sequence,
-        synthdef=feedback_phase_modulation_operator,
-        delta=0.0625, # 16th note
-        duration=0.0625, # 16th note
-        adsr=(0.01, 0.3, 0.1, 0.0),
-        amplitude=0.01,
-        curve_1=(-4),
-        feedback_index=RandomPattern(minimum=1.0, maximum=25.0),
-    )
-
-    arpeggio_pattern_2 = EventPattern(
-        carrier_frequency=arpeggio_sequence,
-        synthdef=phase_modulation_operator,
-        delta=0.0625, # 16th note
-        duration=0.0625, # 16th note
-        amplitude=0.001,
-        carrier_adsr=(0.01, 0.3, 0.1, 0.1),
-        carrier_curve=(-4),
-        carrier_phase_index=RandomPattern(minimum=6.0, maximum=12.0),
-        # modulator_adsr=(0.01, 0.1, 0.0, 0.01),
-        modulator_curve=(-4),
-        modulator_phase_index=RandomPattern(minimum=2.0, maximum=12.0),
-    )
-
-    algorithm_1_pattern = EventPattern(
-        frequency=arpeggio_sequence,
-        synthdef=algorithm_1,
-        delta=0.0625, # 16th note
-        duration=0.0625, # 16th note
-        amplitude=0.2,
-        curve_1=(-32),
-        curve_2=(-16),
-        curve_4=(-8),
-        feedback_index=RandomPattern(minimum=1.0, maximum=10.0),
-        phase_index_2=RandomPattern(minimum=1.0, maximum=15.0),
-        phase_index_4=RandomPattern(minimum=5.0, maximum=15.0),
-    )
-
-    algorithm_2_pattern = EventPattern(
-        frequency=arpeggio_sequence,
-        synthdef=algorithm_2,
-        delta=0.0625, # 16th note
-        duration=0.0625, # 16th note
-        amplitude=0.2,
-        curve_1=(-32),
-        curve_2=(-16),
-        curve_4=(-8),
-        feedback_index=RandomPattern(minimum=1.0, maximum=10.0),
-        phase_index_2=RandomPattern(minimum=1.0, maximum=15.0),
-        phase_index_3=RandomPattern(minimum=5.0, maximum=15.0),
-    )
-
-    algorithm_3_pattern = EventPattern(
-        frequency=arpeggio_sequence,
-        synthdef=algorithm_3,
-        delta=0.0625, # 16th note
-        duration=0.0625, # 16th note
-        amplitude=0.2,
-        # curve_1=(-8),
-        # curve_2=(-16),
-        # curve_3=(-8),
-        feedback_index=RandomPattern(minimum=0.0, maximum=5.0),
-        phase_index_2=RandomPattern(minimum=0.0, maximum=7.5),
-        phase_index_3=RandomPattern(minimum=7.6, maximum=15.0),
-    )
 
     algorithm_4_pattern = EventPattern(
-        frequency=arpeggio_sequence,
+        frequency=bass_sequence,
         synthdef=algorithm_4,
-        delta=0.0625, # 16th note
-        duration=0.0625, # 16th note
-        amplitude=0.2,
-        # curve_1=(-8),
-        # curve_2=(-16),
-        # curve_4=(-8),
-        feedback_index=RandomPattern(minimum=0.0, maximum=5.0),
-        phase_index_2=RandomPattern(minimum=0.0, maximum=7.5),
-        phase_index_3=RandomPattern(minimum=7.6, maximum=15.0),
-    )
-
-    algorithm_5_pattern = EventPattern(
-        frequency=arpeggio_sequence,
-        synthdef=algorithm_5,
-        delta=0.0625, # 16th note
-        duration=0.0625, # 16th note
-        amplitude=0.1,
-        # curve_1=(-8),
-        # curve_2=(-16),
-        # curve_4=(-8),
-        feedback_index=RandomPattern(minimum=0.0, maximum=15.0),
-        phase_index_2=RandomPattern(minimum=0.0, maximum=5.0),
+        delta=0.25,
+        duration=0.25,
+        adsr_1=(0.01, 0.5, 0.01, 0.01),
+        adsr_2=(0.01, 0.5, 0.01, 0.01),
+        adsr_3=(0.01, 0.5, 0.01, 0.01),
+        amplitude=0.25,
+        feedback_index=3.832276,
+        phase_index_2=0.197109,
+        phase_index_3=2.11338,
     )
 
     algorithm_6_pattern = EventPattern(
         frequency=arpeggio_sequence,
         synthdef=algorithm_6,
-        delta=0.0625, # 16th note
-        duration=0.0625, # 16th note
-        amplitude=0.1,
-        # curve_1=(-8),
-        # curve_2=(-16),
-        # curve_4=(-8),
+        delta=0.0625,
+        duration=0.0625,
+        amplitude=0.2,
         feedback_index=RandomPattern(minimum=0.0, maximum=15.0),
     )
 
@@ -814,46 +766,22 @@ def main() -> None:
         synthdef=algorithm_7,
         delta=0.5,
         duration=0.5,
-        amplitude=0.2,
-        adsr_1=(4.0, 0.3, 0.01, 1.0),
-        adsr_2=(4.0, 0.3, 0.01, 1.0),
-        adsr_3=(4.0, 0.3, 0.01, 1.0),
-        curve_1=(0),
-        curve_2=(0),
-        curve_3=(0),
-        # feedback_index=RandomPattern(minimum=0.0, maximum=5.0),
+        amplitude=0.06,
+        adsr_1=(2.0, 0.5, 0.01, 1.0),
+        adsr_2=(1.0, 0.3, 0.01, 1.2),
+        adsr_3=(0.5, 0.1, 0.01, 1.5),
+        curve_1=(-8),
+        curve_2=(-4),
+        curve_3=(8),
+        feedback_index=RandomPattern(minimum=0.0, maximum=25.0),
     )
-
-    algorithm_8_pattern = EventPattern(
-        frequency=pad_sequence,
-        synthdef=algorithm_8,
-        delta=0.5,
-        duration=0.5,
-        amplitude=0.1,
-        adsr_1=(1.0, 0.3, 0.1, 1.5),
-        adsr_2=(1.0, 0.3, 0.1, 1.5),
-        adsr_3=(1.0, 0.3, 0.1, 1.5),
-        adsr_4=(1.0, 0.3, 0.1, 1.5),
-        curve_1=(-4),
-        curve_2=(-8),
-        curve_3=(-16),
-        curve_4=(4),
-        feedback_index=RandomPattern(minimum=0.0, maximum=5.0),
-    )
-    
 
     clock = Clock()
     clock.start(beats_per_minute=40.0)
-    # arpeggio_pattern_1.play(clock=clock, context=server)
-    # arpeggio_pattern_2.play(clock=clock, context=server)
-    # algorithm_1_pattern.play(clock=clock, context=server)
-    # algorithm_2_pattern.play(clock=clock, context=server)
-    # algorithm_3_pattern.play(clock=clock, context=server)
-    # algorithm_4_pattern.play(clock=clock, context=server)
-    # algorithm_5_pattern.play(clock=clock, context=server)
-    # algorithm_6_pattern.play(clock=clock, context=server)
-    # algorithm_7_pattern.play(clock=clock, context=server)
-    algorithm_8_pattern.play(clock=clock, context=server)
+    
+    algorithm_4_pattern.play(clock=clock, context=server, quantization='1/4')
+    algorithm_6_pattern.play(clock=clock, context=server, quantization='1/4')
+    algorithm_7_pattern.play(clock=clock, context=server, quantization='1/4')
 
     while True:
         continue

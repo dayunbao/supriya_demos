@@ -50,6 +50,7 @@ def sample_playback(
     buffer_id=0,
     out_bus=0,
 ) -> None:
+    # Using a PlayBuf for simplicity's sake.
     signal = PlayBuf.ar(
         buffer_id=buffer_id,
         done_action=2,
@@ -58,30 +59,8 @@ def sample_playback(
 
     Out.ar(bus=out_bus, source=signal)
 
-def grain_generator_spooky(
-        buffer_id: UGenRecursiveInput,
-        grain_duration: UGenRecursiveInput,
-        position: UGenRecursiveInput,
-        trigger_frequency: UGenRecursiveInput,
-) -> UGenOperable:
-    duration_modulator = LFNoise1.ar(frequency=5).scale(-1.0, 1.0, -0.5, 0.5)
-    grain_duration += duration_modulator
-
-    position_modulator = LFNoise2.ar(frequency=50).scale(-1.0, 1.0, -0.05, 0.05)
-    position += position_modulator
-    
-    signal = GrainBuf.ar(
-        buffer_id=buffer_id,
-        duration=grain_duration,
-        position=position,
-        rate=LFNoise1.ar(frequency=0.1).scale(-1, 1, 0, 1),
-        trigger=Impulse.ar(frequency=trigger_frequency),
-    )
-
-    return signal
-
 @synthdef()
-def granular_synthesis_spooky(
+def granular_synthesis_ambient(
     adsr=(0.01, 0.3, 0.5, 1.0),
     amplitude=0.5,
     buffer_id=0,
@@ -102,12 +81,20 @@ def granular_synthesis_spooky(
         gate=gate,
     )
 
-    signal = grain_generator_spooky(
+    duration_modulator = LFNoise1.ar(frequency=5).scale(-1.0, 1.0, -0.5, 0.5)
+    grain_duration += duration_modulator
+
+    position_modulator = LFNoise2.ar(frequency=50).scale(-1.0, 1.0, -0.05, 0.05)
+    position += position_modulator
+    
+    signal = GrainBuf.ar(
         buffer_id=buffer_id,
-        grain_duration=grain_duration,
+        duration=grain_duration,
         position=position,
-        trigger_frequency=trigger_frequency
+        rate=LFNoise1.ar(frequency=0.1).scale(-1, 1, 0, 1),
+        trigger=Impulse.ar(frequency=trigger_frequency),
     )
+
     signal = Limiter.ar(level=amplitude, source=signal)
     signal *= envelope
     Out.ar(bus=out_bus, source=signal)
@@ -283,6 +270,20 @@ def reverb(
     Out.ar(bus=out_bus, source=signal)
 
 def main() -> None:
+    # Set some values.
+    bpm = 80
+    seconds_per_beat = 60/bpm
+    # Used to pause start of patterns.
+    seconds_per_measure = seconds_per_beat * 4
+
+    # Calculate/set the start times (normalized in a 0-1 scale)
+    # and grain durations for the granular synths.
+    time_tombs_start = 3.269/10.948
+    time_tombs_grain_duration = 1.069    
+    ten_thousand_years_start = 9.882/10.948
+    artifacts_start = 4.704
+
+    # Get the server booted and SynthDef's loaded.
     server = Server().boot(memory_size=65536)
     server.add_synthdefs(
         delay, 
@@ -290,19 +291,22 @@ def main() -> None:
         granular_synthesis_melody,
         granular_synthesis_pad,
         granular_synthesis_percussion,
-        granular_synthesis_spooky,
+        granular_synthesis_ambient,
         reverb,
         sample_playback
     )
     server.sync()
-
+    
+    # Load the sample into a buffer.
     time_tombs_sample_path = Path(__file__).parent / 'samples/time_tombs.mp3'
     time_tombs_sample_buffer = server.add_buffer(file_path=str(time_tombs_sample_path))
     server.sync()
-
+    
+    # Set up buses.
     delay_bus: Bus = server.add_bus(calculation_rate='audio')
     reverb_bus: Bus = server.add_bus(calculation_rate='audio')
-
+    
+    # Create the effects synths.
     server.add_synth(
         add_action=AddAction.ADD_TO_TAIL,
         in_bus=int(delay_bus),
@@ -317,22 +321,16 @@ def main() -> None:
         synthdef=reverb,
     )
 
-    time_tombs_start = 3.269/10.948
-    time_tombs_grain_duration = 1.069
-    
-    ten_thousand_years_start = 9.882/10.948
-    
-    artifacts_start = 4.704
-
-    spooky_pattern = EventPattern(
-        delta=0.25,
-        duration=0.25,
+    # Create the patterns that will the granular synths.
+    ambient_pattern = EventPattern(
+        delta=0.25, # 1/4 note
+        duration=0.25, # 1/4 note
         amplitude=0.3,
         buffer_id=time_tombs_sample_buffer.id_,
         grain_duration=time_tombs_grain_duration,
         out_bus=delay_bus,
         position=time_tombs_start,
-        synthdef=granular_synthesis_spooky,
+        synthdef=granular_synthesis_ambient,
         trigger_frequency=RandomPattern(minimum=10000, maximum=50000, iterations=None),
     )
 
@@ -341,8 +339,8 @@ def main() -> None:
     bass_scale = [midi_note_number_to_frequency(root_note + n) for n in diminshed_bass_scale]
     sequence_pattern = SequencePattern(sequence=bass_scale, iterations=None)
     bass_pattern = EventPattern(
-        delta=0.5,
-        duration=0.5,
+        delta=0.5, # 1/2 note
+        duration=0.5, # 1/2 note
         amplitude=1.75,
         buffer_id=time_tombs_sample_buffer.id_,
         grain_duration=0.05,
@@ -353,33 +351,33 @@ def main() -> None:
     )
 
     pad_root_note = 62
-    pad_scale = [
+    pad_chords = [
         [
-            midi_note_number_to_frequency(6 + pad_root_note),
-            midi_note_number_to_frequency(6 + pad_root_note + 3),
-            midi_note_number_to_frequency(6 + pad_root_note + 12),
+            midi_note_number_to_frequency(pad_root_note + 6),
+            midi_note_number_to_frequency(pad_root_note + 6 + 3),
+            midi_note_number_to_frequency(pad_root_note + 6 + 12),
         ],
         [
-            midi_note_number_to_frequency(3 + pad_root_note),
-            midi_note_number_to_frequency(3 + pad_root_note + 3),
-            midi_note_number_to_frequency(3 + pad_root_note + 12),
+            midi_note_number_to_frequency(pad_root_note + 3),
+            midi_note_number_to_frequency(pad_root_note + 3 + 3),
+            midi_note_number_to_frequency(pad_root_note + 3 + 12),
         ],
         [
-            midi_note_number_to_frequency(4 + pad_root_note),
-            midi_note_number_to_frequency(4 + pad_root_note + 3),
-            midi_note_number_to_frequency(4 + pad_root_note + 12),
+            midi_note_number_to_frequency(pad_root_note + 4),
+            midi_note_number_to_frequency(pad_root_note + 4 + 3),
+            midi_note_number_to_frequency(pad_root_note + 4 + 12),
         ],
         [
-            midi_note_number_to_frequency(7 + pad_root_note),
-            midi_note_number_to_frequency(7 + pad_root_note + 3),
-            midi_note_number_to_frequency(7 + pad_root_note + 12),
+            midi_note_number_to_frequency(pad_root_note + 7),
+            midi_note_number_to_frequency(pad_root_note + 7 + 3),
+            midi_note_number_to_frequency(pad_root_note + 7 + 12),
         ],
     ]
     
-    pad_sequence_pattern = SequencePattern(sequence=pad_scale, iterations=None)
+    pad_sequence_pattern = SequencePattern(sequence=pad_chords, iterations=None)
     pad_pattern = EventPattern(
-        delta=0.5,
-        duration=0.5,
+        delta=0.5, # 1/2 note
+        duration=0.5, # 1/2 note
         adsr=(0.01, 0.6, 0.2, 0.1),
         amplitude=2.0,
         buffer_id=time_tombs_sample_buffer.id_,
@@ -391,8 +389,8 @@ def main() -> None:
     )
 
     high_hat_pattern = EventPattern(
-        delta=0.0625,
-        duration=0.0625,
+        delta=0.0625, # 1/16 note
+        duration=0.0625, # 1/16 note
         amplitude=RandomPattern(minimum=0.08, maximum=0.3, iterations=None),
         buffer_id=time_tombs_sample_buffer.id_,
         grain_duration=0.09,
@@ -407,8 +405,8 @@ def main() -> None:
     snare_gates = [0, 1]
     snare_sequence_pattern = SequencePattern(sequence=snare_gates, iterations=None)
     snare_pattern = EventPattern(
-        delta=0.25,
-        duration=0.25,
+        delta=0.25, # 1/4 note
+        duration=0.25, # 1/4 note
         amplitude=0.5,
         buffer_id=time_tombs_sample_buffer.id_,
         gate=snare_sequence_pattern,
@@ -423,30 +421,30 @@ def main() -> None:
 
     melody_root_note = 74
     melody_scale = [
-        midi_note_number_to_frequency(6 + melody_root_note + 12),
-        midi_note_number_to_frequency(6 + melody_root_note + 3),
-        midi_note_number_to_frequency(6 + melody_root_note),
-        midi_note_number_to_frequency(6 + melody_root_note - 12),
+        midi_note_number_to_frequency(melody_root_note + 6 + 12),
+        midi_note_number_to_frequency(melody_root_note + 6 + 3),
+        midi_note_number_to_frequency(melody_root_note + 6),
+        midi_note_number_to_frequency(melody_root_note + 6 - 12),
         
-        midi_note_number_to_frequency(3 + melody_root_note + 12),
-        midi_note_number_to_frequency(3 + melody_root_note + 3),
-        midi_note_number_to_frequency(3 + melody_root_note),
-        midi_note_number_to_frequency(3 + melody_root_note - 12),
+        midi_note_number_to_frequency(melody_root_note + 3 + 12),
+        midi_note_number_to_frequency(melody_root_note + 3 + 3),
+        midi_note_number_to_frequency(melody_root_note + 3),
+        midi_note_number_to_frequency(melody_root_note + 3 - 12),
 
-        midi_note_number_to_frequency(4 + melody_root_note + 12),
-        midi_note_number_to_frequency(4 + melody_root_note + 3),
-        midi_note_number_to_frequency(4 + melody_root_note),
-        midi_note_number_to_frequency(4 + melody_root_note - 12),
+        midi_note_number_to_frequency(melody_root_note + 4 + 12),
+        midi_note_number_to_frequency(melody_root_note + 4 + 3),
+        midi_note_number_to_frequency(melody_root_note + 4),
+        midi_note_number_to_frequency(melody_root_note + 4 - 12),
 
-        midi_note_number_to_frequency(7 + melody_root_note + 12),
-        midi_note_number_to_frequency(7 + melody_root_note + 3),
-        midi_note_number_to_frequency(7 + melody_root_note),
-        midi_note_number_to_frequency(7 + melody_root_note - 12),
+        midi_note_number_to_frequency(melody_root_note + 7 + 12),
+        midi_note_number_to_frequency(melody_root_note + 7 + 3),
+        midi_note_number_to_frequency(melody_root_note + 7),
+        midi_note_number_to_frequency(melody_root_note + 7 - 12),
     ]
     melody_sequence_pattern = SequencePattern(sequence=melody_scale, iterations=None)
     melody_pattern = EventPattern(
-        delta=0.125,
-        duration=0.125,
+        delta=0.125, # 1/8 note
+        duration=0.125, # 1/8 note
         amplitude=0.1,
         buffer_id=time_tombs_sample_buffer.id_,
         grain_duration=0.09,
@@ -456,12 +454,9 @@ def main() -> None:
         trigger_frequency=melody_sequence_pattern,
     )
 
-    bpm = 80
-    seconds_per_beat = 60/bpm
-    seconds_per_measure = seconds_per_beat * 4
-
     clock = Clock()
     clock.start(beats_per_minute=bpm)
+    
     # One-shot playback of the original sample
     server.add_synth(
         buffer_id=time_tombs_sample_buffer.id_,
@@ -469,7 +464,7 @@ def main() -> None:
         synthdef=sample_playback,
     )
     time.sleep(seconds_per_measure * 3)
-    spooky_pattern.play(clock=clock, context=server)
+    ambient_pattern.play(clock=clock, context=server)
     time.sleep(seconds_per_measure * 2)
     bass_pattern.play(clock=clock, context=server)
     time.sleep(seconds_per_measure * 4)

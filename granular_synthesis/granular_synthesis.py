@@ -20,7 +20,7 @@ import sys
 import time
 from pathlib import Path
 
-from supriya import AddAction, Bus, Envelope, Server, synthdef, UGenOperable
+from supriya import AddAction, Bus, Envelope, Server, synthdef
 from supriya.clocks import Clock
 from supriya.conversions import midi_note_number_to_frequency
 from supriya.patterns import EventPattern, RandomPattern, SequencePattern
@@ -36,27 +36,27 @@ from supriya.ugens import (
     SinOsc,
 )
 from supriya.ugens.bufio import PlayBuf
-from supriya.ugens.core import UGenRecursiveInput
 from supriya.ugens.dynamics import Limiter
 from supriya.ugens.filters import HPF, RLPF
 from supriya.ugens.granular import GrainBuf
+from supriya.ugens.info import BufDur
 from supriya.ugens.lines import LinExp
 from supriya.ugens.noise import LFNoise1, LFNoise2, WhiteNoise
 from supriya.ugens.osc import Impulse
 
 
 @synthdef()
-def sample_playback(
-    buffer_id=0,
-    out_bus=0,
-) -> None:
-    # Using a PlayBuf for simplicity's sake.
-    signal = PlayBuf.ar(
-        buffer_id=buffer_id,
-        done_action=2,
-        rate=0.5,
+def delay(
+    in_bus: 2, 
+    out_bus: 0
+):
+    signal = In.ar(bus=in_bus, channel_count=1)
+    signal = CombL.ar(
+        delay_time=0.2,
+        decay_time=3.5,
+        maximum_delay_time=0.2,
+        source=signal
     )
-
     Out.ar(bus=out_bus, source=signal)
 
 @synthdef()
@@ -65,9 +65,9 @@ def granular_synthesis_ambient(
     amplitude=0.5,
     buffer_id=0,
     gate=1,
-    grain_duration=1,
+    grain_duration=1.0,
+    grain_start=0.0,
     out_bus=0,
-    position=0,
     trigger_frequency=440,
 ) -> None:
     envelope = EnvGen.kr(
@@ -84,6 +84,7 @@ def granular_synthesis_ambient(
     duration_modulator = LFNoise1.ar(frequency=5).scale(-1.0, 1.0, -0.5, 0.5)
     grain_duration += duration_modulator
 
+    position = grain_start / BufDur.ir(buffer_id=buffer_id)
     position_modulator = LFNoise2.ar(frequency=50).scale(-1.0, 1.0, -0.05, 0.05)
     position += position_modulator
     
@@ -104,9 +105,9 @@ def granular_synthesis_bass(
     amplitude=1.0,
     buffer_id=0,
     gate=1,
-    grain_duration=1,
+    grain_duration=1.0,
+    grain_start=0.0,
     out_bus=0,
-    position=0,
     rate=1,
     trigger_frequency=440,
 ) -> None:
@@ -116,6 +117,7 @@ def granular_synthesis_bass(
         gate=gate,
     )
 
+    position = grain_start / BufDur.ir(buffer_id=buffer_id)
     signal = GrainBuf.ar(
         buffer_id=buffer_id,
         duration=grain_duration,
@@ -141,85 +143,14 @@ def granular_synthesis_bass(
     Out.ar(bus=out_bus, source=signal)
 
 @synthdef()
-def granular_synthesis_pad(
-    adsr=(0.01, 0.3, 0.5, 3.0),
-    amplitude=1.0,
-    buffer_id=0,
-    curve=(-4),
-    gate=1,
-    grain_duration=1,
-    out_bus=0,
-    position=0,
-    rate=1,
-    trigger_frequency=440,
-) -> None:
-    envelope = EnvGen.kr(
-        done_action=2,
-        envelope=Envelope.adsr(
-            attack_time=adsr[0],
-            decay_time=adsr[1], 
-            sustain=adsr[2],
-            release_time=adsr[3],
-            curve=curve[0],
-        ),
-        gate=gate,
-    )
-
-    signal = GrainBuf.ar(
-        buffer_id=buffer_id,
-        duration=grain_duration,
-        position=position,
-        rate=rate,
-        trigger=Impulse.ar(frequency=trigger_frequency),
-    )
-    signal = HPF.ar(source=signal, frequency=800)
-    signal = Limiter.ar(level=amplitude, source=signal)
-    signal *= envelope
-    Out.ar(bus=out_bus, source=signal)
-
-@synthdef()
-def granular_synthesis_percussion(
-    amplitude=1.0,
-    buffer_id=0,
-    gate=1,
-    grain_duration=1,
-    hpf_frequency=1000,
-    out_bus=0,
-    position=0,
-    rate=1,
-    release_time=(1.0),
-    trigger_frequency=440,
-) -> None:
-    envelope = EnvGen.kr(
-        done_action=2,
-        envelope=Envelope.percussive(release_time=release_time[0]),
-        gate=gate,
-    )
-
-    signal = GrainBuf.ar(
-        buffer_id=buffer_id,
-        duration=grain_duration,
-        position=position,
-        rate=rate,
-        trigger=Impulse.ar(frequency=trigger_frequency),
-    )
-    
-    noise = WhiteNoise.ar()
-    signal += noise
-    signal *= amplitude
-    signal *= envelope
-    signal = HPF.ar(source=signal, frequency=hpf_frequency)
-    Out.ar(bus=out_bus, source=signal)
-
-@synthdef()
 def granular_synthesis_melody(
     amplitude=1.0,
     buffer_id=0,
     gate=1,
-    grain_duration=1,
+    grain_duration=1.0,
+    grain_start=0.0,
     hpf_frequency=1000,
     out_bus=0,
-    position=0,
     rate=1,
     release_time=(1.0),
     trigger_frequency=440,
@@ -230,6 +161,7 @@ def granular_synthesis_melody(
         gate=gate,
     )
 
+    position = grain_start / BufDur.ir(buffer_id=buffer_id)
     signal = GrainBuf.ar(
         buffer_id=buffer_id,
         duration=grain_duration,
@@ -246,17 +178,75 @@ def granular_synthesis_melody(
     Out.ar(bus=out_bus, source=signal)
 
 @synthdef()
-def delay(
-    in_bus: 2, 
-    out_bus: 0
-):
-    signal = In.ar(bus=in_bus, channel_count=1)
-    signal = CombL.ar(
-        delay_time=0.2,
-        decay_time=3.5,
-        maximum_delay_time=0.2,
-        source=signal
+def granular_synthesis_pad(
+    adsr=(0.01, 0.3, 0.5, 3.0),
+    amplitude=1.0,
+    buffer_id=0,
+    curve=(-4),
+    gate=1,
+    grain_duration=1.0,
+    grain_start=0.0,
+    out_bus=0,
+    rate=1,
+    trigger_frequency=440,
+) -> None:
+    envelope = EnvGen.kr(
+        done_action=2,
+        envelope=Envelope.adsr(
+            attack_time=adsr[0],
+            decay_time=adsr[1], 
+            sustain=adsr[2],
+            release_time=adsr[3],
+            curve=curve[0],
+        ),
+        gate=gate,
     )
+
+    position = grain_start / BufDur.ir(buffer_id=buffer_id)
+    signal = GrainBuf.ar(
+        buffer_id=buffer_id,
+        duration=grain_duration,
+        position=position,
+        rate=rate,
+        trigger=Impulse.ar(frequency=trigger_frequency),
+    )
+    signal = Limiter.ar(level=amplitude, source=signal)
+    signal *= envelope
+    Out.ar(bus=out_bus, source=signal)
+
+@synthdef()
+def granular_synthesis_percussion(
+    amplitude=1.0,
+    buffer_id=0,
+    gate=1,
+    grain_duration=1.0,
+    grain_start=0.0,
+    hpf_frequency=1000,
+    out_bus=0,
+    rate=1,
+    release_time=(1.0),
+    trigger_frequency=440,
+) -> None:
+    envelope = EnvGen.kr(
+        done_action=2,
+        envelope=Envelope.percussive(release_time=release_time[0]),
+        gate=gate,
+    )
+
+    position = grain_start / BufDur.ir(buffer_id=buffer_id)
+    signal = GrainBuf.ar(
+        buffer_id=buffer_id,
+        duration=grain_duration,
+        position=position,
+        rate=rate,
+        trigger=Impulse.ar(frequency=trigger_frequency),
+    )
+    
+    noise = WhiteNoise.ar()
+    signal += noise
+    signal *= amplitude
+    signal *= envelope
+    signal = HPF.ar(source=signal, frequency=hpf_frequency)
     Out.ar(bus=out_bus, source=signal)
 
 @synthdef()
@@ -269,6 +259,20 @@ def reverb(
     signal = Pan2.ar(source=signal)
     Out.ar(bus=out_bus, source=signal)
 
+@synthdef()
+def sample_playback(
+    buffer_id=0,
+    out_bus=0,
+) -> None:
+    # Using a PlayBuf for simplicity's sake.
+    signal = PlayBuf.ar(
+        buffer_id=buffer_id,
+        done_action=2,
+        rate=0.5,
+    )
+
+    Out.ar(bus=out_bus, source=signal)
+
 def main() -> None:
     # Set some values.
     bpm = 80
@@ -276,11 +280,10 @@ def main() -> None:
     # Used to pause start of patterns.
     seconds_per_measure = seconds_per_beat * 4
 
-    # Calculate/set the start times (normalized in a 0-1 scale)
-    # and grain durations for the granular synths.
-    time_tombs_start = 3.269/10.948
-    time_tombs_grain_duration = 1.069    
-    ten_thousand_years_start = 9.882/10.948
+    # Set the start times and grain durations.
+    time_tombs_start = 3.269
+    time_tombs_grain_duration = 1.069
+    ten_thousand_years_start = 9.882
     artifacts_start = 4.704
 
     # Get the server booted and SynthDef's loaded.
@@ -328,8 +331,8 @@ def main() -> None:
         amplitude=0.3,
         buffer_id=time_tombs_sample_buffer.id_,
         grain_duration=time_tombs_grain_duration,
+        grain_start=time_tombs_start,
         out_bus=delay_bus,
-        position=time_tombs_start,
         synthdef=granular_synthesis_ambient,
         trigger_frequency=RandomPattern(minimum=10000, maximum=50000, iterations=None),
     )
@@ -344,8 +347,8 @@ def main() -> None:
         amplitude=1.75,
         buffer_id=time_tombs_sample_buffer.id_,
         grain_duration=0.05,
+        grain_start=ten_thousand_years_start,
         out_bus=delay_bus,
-        position=ten_thousand_years_start,
         synthdef=granular_synthesis_bass,
         trigger_frequency=sequence_pattern,
     )
@@ -379,11 +382,11 @@ def main() -> None:
         delta=0.5, # 1/2 note
         duration=0.5, # 1/2 note
         adsr=(0.01, 0.6, 0.2, 0.1),
-        amplitude=2.0,
+        amplitude=0.03,
         buffer_id=time_tombs_sample_buffer.id_,
         grain_duration=0.015,
+        grain_start=artifacts_start,
         out_bus=delay_bus,
-        position=artifacts_start,
         synthdef=granular_synthesis_pad,
         trigger_frequency=pad_sequence_pattern,
     )
@@ -394,9 +397,9 @@ def main() -> None:
         amplitude=RandomPattern(minimum=0.08, maximum=0.3, iterations=None),
         buffer_id=time_tombs_sample_buffer.id_,
         grain_duration=0.09,
+        grain_start=ten_thousand_years_start,
         hpf_frequency=2000,
         out_bus=reverb_bus,
-        position=ten_thousand_years_start,
         release_time=(0.05),
         synthdef=granular_synthesis_percussion,
         trigger_frequency=1000,
@@ -411,9 +414,9 @@ def main() -> None:
         buffer_id=time_tombs_sample_buffer.id_,
         gate=snare_sequence_pattern,
         grain_duration=0.09,
+        grain_start=ten_thousand_years_start,
         hpf_frequency=800,
         out_bus=reverb_bus,
-        position=ten_thousand_years_start,
         release_time=(0.25),
         synthdef=granular_synthesis_percussion,
         trigger_frequency=200,
@@ -448,8 +451,8 @@ def main() -> None:
         amplitude=0.1,
         buffer_id=time_tombs_sample_buffer.id_,
         grain_duration=0.09,
+        grain_start=ten_thousand_years_start,
         out_bus=delay_bus,
-        position=ten_thousand_years_start,
         synthdef=granular_synthesis_melody,
         trigger_frequency=melody_sequence_pattern,
     )

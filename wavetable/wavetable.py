@@ -18,8 +18,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 import random
 import sys
 from math import pi
+from pprint import pprint
 
-from supriya import AddAction, Buffer, BufferGroup, Bus, Envelope, Server, synthdef, UGenOperable
+from supriya import (
+    AddAction, 
+    Buffer, 
+    BufferGroup, 
+    Bus, 
+    Envelope, 
+    Server, 
+    synthdef, 
+    UGenOperable
+)
 from supriya.clocks import Clock
 from supriya.conversions import midi_note_number_to_frequency
 from supriya.enums import EnvelopeShape
@@ -56,7 +66,9 @@ def delay(in_bus=2, out_bus=0) -> None:
 @synthdef()
 def reverb(in_bus=2, out_bus=0) -> None:
     input = In.ar(bus=in_bus, channel_count=2)
+    
     signal= FreeVerb.ar(source=input, mix=0.55, room_size=0.95, damping=0.5)
+    
     Out.ar(bus=out_bus, source=signal)
 
 def modulating_phase_wavetable(
@@ -151,8 +163,9 @@ def wavetable_cosc(
 def variable_wavetable(
     buf_start_num, 
     num_buffs, 
-    adsr=(0.01, 0.3, 0.5, 1.0),
+    amplitude_adsr=(0.01, 0.3, 0.5, 1.0),
     amplitude=1.0,
+    cutoff=400,
     frequency=440.0, 
     gate=1,
     out_bus=0,
@@ -176,19 +189,21 @@ def variable_wavetable(
     # Make sure the signal doesn't have any DC bias.
     signal = LeakDC.ar(source=signal)
     
-    # An envelope to control the resonant low-pass filter.
+    # An envelope to control the resonant low-pass filter's frequency_cutoff.
     filter_envelope = EnvGen.kr(
         envelope=Envelope.adsr(
-            attack_time=1.25,
-            decay_time=0.75,
-            sustain=0.1,
-            release_time=0.1,
+            attack_time=1.0,
+            decay_time=0.5,
+            sustain=0.5,
+            release_time=0.3,
         ), 
     )
 
+    # Apply the envelope to the cutoff frequency.
+    # Taken from https://scsynth.org/t/modulate-an-lpf-freq-cutoff-using-an-envelope-or-lfo/5098/2.
     signal = RLPF.ar(
         source=signal, 
-        frequency=400 + filter_envelope.scale(
+        frequency=cutoff + filter_envelope.scale(
             input_minimum=0.0,
             input_maximum=1.0,
             output_minimum=0,
@@ -199,10 +214,10 @@ def variable_wavetable(
     
     amplitude_envelope = EnvGen.kr(
         envelope=Envelope.adsr(
-            attack_time=adsr[0],
-            decay_time=adsr[1],
-            sustain=adsr[2],
-            release_time=adsr[3],
+            attack_time=amplitude_adsr[0],
+            decay_time=amplitude_adsr[1],
+            sustain=amplitude_adsr[2],
+            release_time=amplitude_adsr[3],
         ), 
         done_action=2, 
         gate=gate
@@ -256,7 +271,7 @@ def create_wavetable(buffer: Buffer, server: Server) -> None:
     
     buffer.zero()
     server.sync()
-    
+    # Load the wavtetable into the buffer.
     buffer.set_range(index=0, values=wavetable)
 
 def create_vosc_buffers(num_buffers: int, server: Server) -> BufferGroup:
@@ -335,7 +350,7 @@ def main() -> None:
         delta=1.0,
         duration=1.0,
         adsr=(0.5, 0.3, 0.5, 0.4),
-        amplitude=0.08,
+        amplitude=0.1,
         buffer_id=chorusing_wavetable_buffer.id_,
         out_bus=reverb_bus,
     )
@@ -407,6 +422,7 @@ def main() -> None:
         fifth_2,
         fifth_2,
     ]
+
     melody_sequence = SequencePattern(sequence=melody_notes, iterations=None)
     melody_pattern = EventPattern(
         frequency=melody_sequence,
@@ -433,7 +449,7 @@ def main() -> None:
         synthdef=variable_wavetable,
         delta=1.0,
         duration=1.0,
-        adsr=(0.5, 0.3, 0.5, 0.4),
+        amplitude_adsr=(0.5, 0.3, 0.5, 0.4),
         amplitude=0.3,
         buf_start_num=vosc_wavetable_buffers[0].id_,
         num_buffs=vosc_wavetable_buffers.count,

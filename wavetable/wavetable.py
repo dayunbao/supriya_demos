@@ -1,5 +1,4 @@
-"""A script demonstrating a low-pass filter with an LFO assigned to the cutoff frequency.
-
+"""A script demonstrating wavetable synthesis.
 
 Copyright 2025, Andrew Clark
 
@@ -18,13 +17,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 import random
 import sys
+from math import pi
 
-import supriya
 from supriya import AddAction, Buffer, BufferGroup, Bus, Envelope, Server, synthdef, UGenOperable
 from supriya.clocks import Clock
 from supriya.conversions import midi_note_number_to_frequency
 from supriya.enums import EnvelopeShape
-from supriya.patterns import EventPattern, RandomPattern, SequencePattern
+from supriya.patterns import EventPattern, SequencePattern
 from supriya.patterns.structure import ParallelPattern
 from supriya.ugens import (
     CombL,
@@ -32,37 +31,86 @@ from supriya.ugens import (
     EnvGen,
     FreeVerb,
     In,
-    Limiter,
-    LinLin, 
     Out, 
     Pan2,
-    SinOsc,
 )
 from supriya.ugens.core import UGenRecursiveInput
-from supriya.ugens.filters import LeakDC
+from supriya.ugens.filters import LeakDC, RLPF
 from supriya.ugens.noise import LFNoise1
-from supriya.ugens.panning import Splay
 from supriya.ugens.osc import COsc, Osc, VOsc
 
+# SynthDefs
+@synthdef()
+def delay(in_bus=2, out_bus=0) -> None:
+    input = In.ar(bus=in_bus, channel_count=2)
+    
+    signal = CombL.ar(
+        delay_time=0.2,
+        decay_time=2.5,
+        maximum_delay_time=0.2, 
+        source=input
+    )
+    
+    Out.ar(bus=out_bus, source=signal)
+
+@synthdef()
+def reverb(in_bus=2, out_bus=0) -> None:
+    input = In.ar(bus=in_bus, channel_count=2)
+    signal= FreeVerb.ar(source=input, mix=0.55, room_size=0.95, damping=0.5)
+    Out.ar(bus=out_bus, source=signal)
+
+def modulating_phase_wavetable(
+    buffer_id: UGenRecursiveInput, 
+    frequency: UGenRecursiveInput, 
+    modulate_phase: UGenRecursiveInput
+) -> UGenOperable:
+    """A helper function that makes it possible to modulate the phase of the Osc based on a condition.
+    This was done since using a conditional in a SynthDef is tricky.
+
+    The SynthDef requires this to be defined before it.
+    """
+    if modulate_phase:
+        return Osc.ar(
+            buffer_id=buffer_id, 
+            frequency=frequency, 
+            initial_phase=LFNoise1.ar(frequency=1).scale(
+                input_minimum=-1.0,
+                input_maximum=1.0,
+                output_minimum=-(8*pi),
+                output_maximum=(8*pi),
+            ))
+    
+    return Osc.ar(buffer_id=buffer_id, frequency=frequency)
 
 @synthdef()
 def wavetable_osc(
     buffer_id, 
+    adsr=(0.01, 0.3, 0.5, 1.0),
     amplitude=1.0, 
     frequency=440.0, 
     gate=1,
-    initial_phase=0.0,
+    modulate_phase=False,
     out_bus=0,
 ) -> None:
-    signal = Osc.ar(buffer_id=buffer_id, frequency=frequency, initial_phase=initial_phase)
+    signal = modulating_phase_wavetable(buffer_id=buffer_id, frequency=frequency, modulate_phase=modulate_phase)
+    
+    # Make sure the signal doesn't have any DC bias.
     signal = LeakDC.ar(source=signal)
+    
     envelope = EnvGen.kr(
-        envelope=Envelope.percussive(),
+        envelope=Envelope.adsr(
+            attack_time=adsr[0],
+            decay_time=adsr[1],
+            sustain=adsr[2],
+            release_time=adsr[3],
+        ), 
         done_action=2,
         gate=gate,
     )
+    
     signal *= envelope
     signal = Pan2.ar(source=signal, level=amplitude)
+    
     Out.ar(bus=out_bus, source=signal)
 
 @synthdef()
@@ -77,15 +125,12 @@ def wavetable_cosc(
     signal = COsc.ar(
         buffer_id=buffer_id, 
         frequency=frequency, 
-        # beats=0.5,
-        beats=SinOsc.ar(frequency=1).scale(
-            input_minimum=-1.0,
-            input_maximum=1.0,
-            output_minimum=0.1,
-            output_maximum=1.0,
-        ),
+        beats=0.1,
     )
+    
+    # Make sure the signal doesn't have any DC bias.
     signal = LeakDC.ar(source=signal)
+    
     envelope = EnvGen.kr(
         envelope=Envelope.adsr(
             attack_time=adsr[0],
@@ -96,8 +141,10 @@ def wavetable_cosc(
         done_action=2, 
         gate=gate
     )
+    
     signal *= envelope
     signal = Pan2.ar(source=signal, level=amplitude)
+    
     Out.ar(bus=out_bus, source=signal)
 
 @synthdef()
@@ -109,30 +156,48 @@ def variable_wavetable(
     frequency=440.0, 
     gate=1,
     out_bus=0,
-    phase=0.0
 ) -> None:
-    # signal = Osc.ar(buffer_id=buffer_id, frequency=frequency, initial_phase=initial_phase)
-    # modulator = LFNoise1.kr(frequency=1)
-    # modulator = SinOsc.ar(frequency=0.5)
-    # buf_pos = LinLin.kr(
-    #     source=modulator,
-    #     input_minimum=-1.0,
-    #     input_maximum=1.0,
-    #     output_minimum=buf_start_num,
-    #     output_maximum=num_buffs - 1,
-    # )
     signal = VOsc.ar(
-        buffer_id=SinOsc.ar(frequency=0.5).scale(
+        buffer_id=LFNoise1.ar(frequency=1).scale(
             input_minimum=-1.0,
             input_maximum=1.0,
             output_minimum=buf_start_num,
             output_maximum=num_buffs - 1,
         ), 
         frequency=frequency, 
-        phase=phase
+        phase=LFNoise1.ar(frequency=0.3).scale(
+            input_minimum=-1.0,
+            input_maximum=1.0,
+            output_minimum=-(8*pi),
+            output_maximum=(8*pi),
+        )
     )
+
+    # Make sure the signal doesn't have any DC bias.
     signal = LeakDC.ar(source=signal)
-    envelope = EnvGen.kr(
+    
+    # An envelope to control the resonant low-pass filter.
+    filter_envelope = EnvGen.kr(
+        envelope=Envelope.adsr(
+            attack_time=1.25,
+            decay_time=0.75,
+            sustain=0.1,
+            release_time=0.1,
+        ), 
+    )
+
+    signal = RLPF.ar(
+        source=signal, 
+        frequency=400 + filter_envelope.scale(
+            input_minimum=0.0,
+            input_maximum=1.0,
+            output_minimum=0,
+            output_maximum=800,
+        ), 
+        reciprocal_of_q=0.1,
+    )
+    
+    amplitude_envelope = EnvGen.kr(
         envelope=Envelope.adsr(
             attack_time=adsr[0],
             decay_time=adsr[1],
@@ -142,28 +207,18 @@ def variable_wavetable(
         done_action=2, 
         gate=gate
     )
-    signal *= envelope
+
+    signal *= amplitude_envelope
     signal = Pan2.ar(source=signal, level=amplitude)
+    
     Out.ar(bus=out_bus, source=signal)
 
-@synthdef()
-def delay(in_bus: 2, out_bus=0) -> None:
-    input = In.ar(bus=in_bus, channel_count=2)
-    signal = CombL.ar(
-        delay_time=0.2,
-        decay_time=2.5,
-        maximum_delay_time=0.2, 
-        source=input
-    )
-    Out.ar(bus=out_bus, source=signal)
-
-@synthdef()
-def reverb(in_bus: 2, out_bus=0) -> None:
-    input = In.ar(bus=in_bus, channel_count=2)
-    signal= FreeVerb.ar(source=input, mix=0.55, room_size=0.95, damping=0.5)
-    Out.ar(bus=out_bus, source=signal)
-
-def convert_to_wavetable(envelope_array):
+# Helper functions
+def convert_to_wavetable(envelope_array) -> list[float]:
+    """Converts a list of floats into a new list in the wavetable format expected by SuperCollider.
+    Taken from:
+      https://github.com/supercollider/supercollider/blob/5c8b58dc36aafd03d656da0a1126810aa95eb04a/lang/LangPrimSource/PyrSignalPrim.cpp#L371
+    """
     size = len(envelope_array)
     wavetable = []
     
@@ -181,67 +236,34 @@ def convert_to_wavetable(envelope_array):
     
     return wavetable
 
-def create_wavetable_buffer(server: Server) -> Buffer:
+def create_random_envelope() -> Envelope:
     num_segments = random.randrange(4, 20)
     amplitudes = [random.uniform(-1.0, 1.0) for _ in range(num_segments + 1)]
     durations = [random.randint(1, 20) for _ in range(num_segments)]
-    # curves = [random.uniform(-20.0, 20.0) for _ in range(num_segments)]
     curves = [EnvelopeShape.WELCH for _ in range(num_segments)]
 
-    # buffer.generate(
-    #     command_name='sine1',
-    #     # amplitudes=amps.serialize(),
-    #     amplitudes=amps,
-    #     should_normalize=True,
-    #     as_wavetable=True,
-    # )
-    
-    buffer = server.add_buffer(channel_count=1, frame_count=2048)
-
-    env = Envelope(
-        # amplitudes=[0, 0.6, -0.9, 0.3, 0],
-        # durations=[4, 3, 2, 1],
-        # curves=EnvelopeShape.LINEAR,
+    return Envelope(
         amplitudes=amplitudes,
         durations=durations,
         curves=curves,
     )
 
-    # length = 1024 (default)
-    env_as_array = env.to_array()
-    wavetable = convert_to_wavetable(envelope_array=env_as_array)
-
+def create_wavetable(buffer: Buffer, server: Server) -> None:
+    envelope = create_random_envelope()
+    envelope_array = envelope.to_array(length=1024)
+    
+    wavetable = convert_to_wavetable(envelope_array=envelope_array)
+    
     buffer.zero()
     server.sync()
-    buffer.set_range(index=0, values=wavetable)
     
-    # supriya.plot(buffer)
-
-    return buffer
+    buffer.set_range(index=0, values=wavetable)
 
 def create_vosc_buffers(num_buffers: int, server: Server) -> BufferGroup:
     buffer_group = server.add_buffer_group(count=num_buffers, channel_count=1, frame_count=2048)
 
     for b in buffer_group.buffers:
-        num_segments = random.randint(4, 20)
-        amplitudes = [random.uniform(-1.0, 1.0) for _ in range(num_segments + 1)]
-        durations = [random.randint(1, 20) for _ in range(num_segments)]
-        # curves = [random.uniform(-20.0, 20.0) for _ in range(segments)]
-        curves = [EnvelopeShape.WELCH for _ in range(num_segments)]
-
-        env = Envelope(
-            amplitudes=amplitudes,
-            durations=durations,
-            curves=curves,
-        )
-
-        # length = 1024 (default)
-        env_as_array = env.to_array()
-        wavetable = convert_to_wavetable(envelope_array=env_as_array)
-
-        b.zero()
-        server.sync()
-        b.set_range(index=0, values=wavetable)
+        create_wavetable(buffer=b, server=server)
 
     return buffer_group
 
@@ -269,28 +291,16 @@ def main() -> None:
         synthdef=reverb,
     )
     
-    chorusing_wavetable_buffer = create_wavetable_buffer(server=server)
-    wavetable_buffer = create_wavetable_buffer(server=server)
-    vosc_buffers = create_vosc_buffers(num_buffers=3, server=server)
+    # Create wavetables
+    chorusing_wavetable_buffer = server.add_buffer(channel_count=1, frame_count=2048)
+    create_wavetable(buffer=chorusing_wavetable_buffer, server=server)
+    
+    wavetable_buffer = server.add_buffer(channel_count=1, frame_count=2048)
+    create_wavetable(buffer=wavetable_buffer, server=server)
+    
+    vosc_wavetable_buffers = create_vosc_buffers(num_buffers=12, server=server)
 
-    # server.add_synth(
-    #     amplitude=0.2,
-    #     buf_start_num=vosc_buffers[0].id_, 
-    #     frequency=midi_note_number_to_frequency(33),
-    #     num_buffs=vosc_buffers.count, 
-    #     synthdef=variable_wavetable,
-    # )
-
-    # server.add_synth(
-    #     buffer_id=wavetable_buffer.id_,
-    #     synthdef=wavetable_osc,
-    # )
-
-    augmented_scale_degrees = [
-        0, 3, 4, 7, 8, 11,
-        12, 15, 16, 19, 20, 23
-    ]
-
+    # Create patterns
     root_note = 51
     chord = [
         [
@@ -325,8 +335,8 @@ def main() -> None:
         delta=1.0,
         duration=1.0,
         adsr=(0.5, 0.3, 0.5, 0.4),
-        amplitude=0.07,
-        buf_start_num=chorusing_wavetable_buffer.id_,
+        amplitude=0.08,
+        buffer_id=chorusing_wavetable_buffer.id_,
         out_bus=reverb_bus,
     )
 
@@ -408,28 +418,48 @@ def main() -> None:
         out_bus=reverb_bus,
     )
 
-    bass_note = 27
-    bass_scale = [0, 8, 3, 4, 7, 15, 16, 8]
+    drone_note = 27
+    drone_sequence = SequencePattern(
+        sequence=[
+            midi_note_number_to_frequency(drone_note + 0),
+            midi_note_number_to_frequency(drone_note + 11),
+            midi_note_number_to_frequency(drone_note + 7),
+            midi_note_number_to_frequency(drone_note + 8),
+        ], 
+        iterations=None
+    )
+    drone_pattern = EventPattern(
+        frequency=drone_sequence,
+        synthdef=variable_wavetable,
+        delta=1.0,
+        duration=1.0,
+        adsr=(0.5, 0.3, 0.5, 0.4),
+        amplitude=0.3,
+        buf_start_num=vosc_wavetable_buffers[0].id_,
+        num_buffs=vosc_wavetable_buffers.count,
+        out_bus=delay_bus,
+    )
+
+    bass_note = 39
+    bass_scale = [0, 8, -1, 3, 7, 15, 16, 8]
     bass_frequencies = [midi_note_number_to_frequency(n + bass_note) for n in bass_scale]
     bass_sequence = SequencePattern(bass_frequencies, iterations=None)
-
     bass_pattern = EventPattern(
         frequency=bass_sequence,
-        synthdef=variable_wavetable,
+        synthdef=wavetable_cosc,
         delta=0.5,
         duration=0.5,
-        adsr=(0.01, 0.3, 0.2, 0.3),
+        adsr=(0.1, 0.3, 0.2, 0.3),
         amplitude=0.09,
-        buf_start_num=vosc_buffers[0].id_,
-        num_buffs=vosc_buffers.count,
+        buffer_id=chorusing_wavetable_buffer.id_,
         out_bus=reverb_bus,
     )
 
     clock = Clock()
     clock.start(beats_per_minute=80.0)
 
-    parallel_pattern = ParallelPattern(patterns=[bass_pattern, chord_pattern, melody_pattern])
-    # parallel_pattern = ParallelPattern(patterns=[bass_pattern])
+    # ParallelPattern makes sure all patterns start playing at the same time.
+    parallel_pattern = ParallelPattern(patterns=[bass_pattern, chord_pattern, drone_pattern, melody_pattern])
     parallel_pattern.play(clock=clock, context=server)
 
     while True:

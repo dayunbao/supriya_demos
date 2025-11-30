@@ -39,7 +39,7 @@ def main() -> None:
     )
 
     root_note = 53
-    # F, A, C, Eb - 2 octaves
+    # F minor mixolydian arpeggio (F, A, C, Eb) - 2 octaves
     arpeggio_notes = [
         midi_note_number_to_frequency(root_note + 0),
         midi_note_number_to_frequency(root_note + 4),

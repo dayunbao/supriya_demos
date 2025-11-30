@@ -1,3 +1,20 @@
+"""
+Copyright 2025, Andrew Clark
+
+This program is free software: you can redistribute it and/or modify 
+it under the terms of the GNU General Public License as published by 
+the Free Software Foundation, either version 3 of the License, or 
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful, 
+but WITHOUT ANY WARRANTY; without even the implied warranty of 
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the 
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License 
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+"""
+
 import sys
 
 from supriya import (
@@ -9,11 +26,11 @@ from supriya.clocks import Clock
 from supriya.conversions import midi_note_number_to_frequency
 from supriya.patterns import EventPattern, ShufflePattern
 
-from synth_defs import plateau_reverb, saw
+from synth_defs import dattorro_reverb, saw
 
 def main() -> None:
     server = Server().boot()
-    server.add_synthdefs(plateau_reverb, saw)
+    server.add_synthdefs(dattorro_reverb, saw)
     server.sync()
 
     reverb_bus: Bus = server.add_bus(calculation_rate='audio')
@@ -23,7 +40,7 @@ def main() -> None:
         add_action=AddAction.ADD_TO_TAIL,
         in_bus=reverb_bus,
         out_bus=0,
-        synthdef=plateau_reverb,
+        synthdef=dattorro_reverb,
         size=0.8,
         decay=0.5,
         diffusion=10.0,
@@ -52,17 +69,17 @@ def main() -> None:
     ]
     arpeggio_sequence = ShufflePattern(
         forbid_repetitions=True,
-        sequence=arpeggio_notes, 
         iterations=None,
+        sequence=arpeggio_notes, 
     )
     
     arpeggio_pattern = EventPattern(
-        frequency=arpeggio_sequence,
-        synthdef=saw,
+        amplitude=0.1,
         delta=0.125,
         duration=0.0625,
-        amplitude=0.1,
+        frequency=arpeggio_sequence,
         out_bus=reverb_bus,
+        synthdef=saw,
     )
 
     clock = Clock()

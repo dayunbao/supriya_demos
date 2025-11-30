@@ -1,4 +1,21 @@
 """
+Copyright 2025, Andrew Clark
+
+This program is free software: you can redistribute it and/or modify 
+it under the terms of the GNU General Public License as published by 
+the Free Software Foundation, either version 3 of the License, or 
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful, 
+but WITHOUT ANY WARRANTY; without even the implied warranty of 
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the 
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License 
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+"""
+
+"""
 Plateau Reverb (Dattorro Digital Reverb Variant)
 
 This implementation is a highly optimized and customized version of the classic
@@ -188,10 +205,9 @@ def pitch_to_frequency(pitch):
     )
 
 @synthdef()
-def plateau_reverb(
+def dattorro_reverb(
     in_bus: int = 2,
     out_bus: int = 0,
-    # Valley Audio parameter ranges (matched exactly)
     pre_delay: float = 0.0,
     size: float = 0.5,
     decay: float = 0.54995,
@@ -199,7 +215,7 @@ def plateau_reverb(
     input_low_cut: float = 10.0,
     input_high_cut: float = 10.0,
     reverb_low_cut: float = 10.0,
-    reverb_high_cut: float = 10.0, # Damping control
+    reverb_high_cut: float = 10.0,
     mod_speed: float = 0.0,
     mod_depth: float = 0.5,
     mod_shape: float = 0.5,
@@ -255,8 +271,6 @@ def plateau_reverb(
 
     # INPUT DIFFUSION: 8 allpass filters in series using fixed Dattorro gains
     scale = size
-    
-    # ... (Diffusers 1-8 remain the same, using fixed-gain AllpassN)
     
     # --- Diffuser 1: 141 samples, gain = 0.75 ---
     d1_time = (141.0 / DATTORRO_SR) * scale
@@ -489,7 +503,7 @@ def plateau_reverb(
     # Additional allpass between delay1 and apf2 - 491 samples, gain = tank_diffusion
     right_apf_1c_delay = (491.0 / DATTORRO_SR) * scale
     right_apf_1c = AllpassN.ar(
-        source=right_damped_filtered, # <--- Damped signal feeds here
+        source=right_damped_filtered,
         maximum_delay_time=0.2,
         delay_time=right_apf_1c_delay,
         decay_time=tank_diffusion
@@ -586,28 +600,18 @@ def plateau_reverb(
     Out.ar(bus=out_bus, source=[left_out, right_out])
 
 @synthdef()
-def saw(frequency=440.0, amplitude=0.5, gate=1, out_bus=0) -> None:
-    """Create a SynthDef.  SynthDefs are used to create Synth instances
-    that play the notes.
-
-    WARNING: It is very easy to end up with a volume MUCH higher than
-    intended when using SuperCollider.  I've attempted to help with
-    this by adding a Limiter UGen to this SynthDef.  Depending on your
-    OS, audio hardware, and possibly a few other factors, this might
-    set the volume too low to be heard.  If so, first adjust the Limiter's
-    `level` argument, then adjust the SynthDef's `amplitude` argument.
-    NEVER set the `level` to anything higher than 1.  YOU'VE BEEN WARNED!
-
-    Args:
-        frequency: the frequency in hertz of a note.
+def saw(amplitude=0.5, frequency=440.0, out_bus=0) -> None:
+    """Args:
         amplitude: the volume.
-        gate: an int, 1 or 0, that controls the envelope.
+        frequency: the frequency in hertz of a note.
+        out_bus: where to direct audio output.
+        
     """
     signal = LFSaw.ar(frequency=[frequency, frequency - 2])
     signal *= amplitude
-    signal = Limiter.ar(duration=0.01, level=0.1, source=signal)
+    signal = Limiter.ar(level=0.1, source=signal)
 
-    env = EnvGen.kr(envelope=Envelope.percussive(), gate=gate, done_action=2)
+    env = EnvGen.kr(envelope=Envelope.percussive(), done_action=2)
     signal *= env
 
     Out.ar(bus=out_bus, source=signal)
